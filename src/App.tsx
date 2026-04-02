@@ -562,6 +562,14 @@ export default function App() {
   const [previousLocation, setPreviousLocation] = useState<[number, number] | null>(null);
   const startYRef = React.useRef(0);
   const [approachingReport, setApproachingReport] = useState<Report | null>(null);
+
+  // Auto-dismiss del radar de proximidad a los 5 segundos
+  useEffect(() => {
+    if (!approachingReport) return;
+    const timer = setTimeout(() => setApproachingReport(null), 5000);
+    return () => clearTimeout(timer);
+  }, [approachingReport]);
+
   const [showConfirmSheet, setShowConfirmSheet] = useState<Report | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [offlineQueue, setOfflineQueue] = useState<Partial<Report>[]>([]);
@@ -1685,7 +1693,8 @@ export default function App() {
                         haptic('short');
                         setNewReport({ ...newReport, latitude: lat, longitude: lng });
                       }} />
-                      {/* El LocationPicker ya muestra el marker, no duplicar aquí */}
+                      {/* Mostrar punto azul de ubicacion actual del usuario en el mini-mapa */}
+                      <UserLocationMarker position={userLocation} />
                     </MapContainer>
                     {!newReport.latitude && (
                       <div className="absolute inset-0 bg-slate-900/20 backdrop-blur-[1px] pointer-events-none flex items-center justify-center">
