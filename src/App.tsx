@@ -4,8 +4,6 @@ import {
   db, 
   googleProvider, 
   signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult,
   signOut, 
   onAuthStateChanged, 
   createUserWithEmailAndPassword,
@@ -653,18 +651,6 @@ export default function App() {
       setLoading(false);
     }, 5000);
 
-    // Manejar el resultado del redirect de Google en móvil
-    getRedirectResult(auth).then(async (result) => {
-      if (result?.user) {
-        // El usuario volvió del redirect, onAuthStateChanged lo manejará
-        console.log("Redirect login successful:", result.user.email);
-      }
-    }).catch((error) => {
-      if (error.code !== 'auth/null-user') {
-        console.error("Redirect result error:", error);
-      }
-    });
-
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       clearTimeout(timeout);
       try {
@@ -926,16 +912,10 @@ export default function App() {
     }
   };
 
-  const isMobileDevice = () => /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-
   const login = async () => {
     try {
-      if (isMobileDevice()) {
-        // En móvil usar redirect para evitar errores COOP con popups
-        await signInWithRedirect(auth, googleProvider);
-      } else {
-        await signInWithPopup(auth, googleProvider);
-      }
+      // Usar popup en todos los dispositivos (redirect causa problemas con COOP en móvil)
+      await signInWithPopup(auth, googleProvider);
     } catch (error) {
       console.error("Login failed", error);
     }
