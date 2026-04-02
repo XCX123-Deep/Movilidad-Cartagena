@@ -1,0 +1,138 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId (auth.uid)
+    // Fields:
+    //   - uid: string (required)
+    //   - displayName: string (optional)
+    //   - email: string (required)
+    //   - photoURL: string (optional)
+    //
+    // Collection: reports
+    // Document ID: auto-generated
+    // Fields:
+    //   - type: string (required, enum: ["transit_checkpoint", "police_presence", "traffic_flow"])
+    //   - location: map (required, {latitude: number, longitude: number})
+    //   - description: string (optional)
+    //   - timestamp: timestamp (required)
+    //   - reporterUid: string (required)
+    //   - status: string (required, enum: ["active", "resolved"])
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.reporterUid;
+    }
+
+    function isValidNewReport(data) {
+      return data.keys().hasAll(['type', 'location', 'timestamp', 'expiresAt', 'reporterUid', 'status']) &&
+             data.type in ['transit_checkpoint', 'police_presence', 'traffic_flow'] &&
+             data.location is map &&
+             data.location.latitude is number &&
+             data.location.longitude is number &&
+             data.status in ['active', 'resolved', 'expired'] &&
+             data.reporterUid == request.auth.uid;
+    }
+
+    function isValidUpdateReport(data, existing) {
+      return data.keys().hasAll(['type', 'location', 'timestamp', 'expiresAt', 'reporterUid', 'status']) &&
+             data.type in ['transit_checkpoint', 'police_presence', 'traffic_flow'] &&
+             data.location is map &&
+             data.location.latitude is number &&
+             data.location.longitude is number &&
+             data.status in ['active', 'resolved', 'expired'] &&
+             data.reporterUid == existing.reporterUid;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+             (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+              isSuperAdmin());
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated() && 
+             (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin' ||
+              (request.auth.token.email == "juniorborre011@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'role', 'status']) &&
+             data.uid is string &&
+             data.email is string &&
+             data.role in ['user', 'admin', 'super_admin'] &&
+             data.status in ['active', 'disabled'];
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /reports/{reportId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidNewReport(request.resource.data);
+      
+      // Permitir actualizaciones parciales: confirmaciones/descarte por cualquier usuario autenticado,
+      // o actualización completa por el dueño/admin
+      allow update: if isAuthenticated() && (
+        // Cualquier usuario puede confirmar o descartar un reporte (update parcial)
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['confirmations', 'dismissals', 'status', 'expiresAt']) ||
+        // El dueño o admin pueden hacer cambios completos
+        (isDocOwner() || isAdmin())
+      );
+      
+      allow delete: if isAuthenticated() && (isDocOwner() || isAdmin());
+    }
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      
+      // Users can update their own sessionId for login
+      allow update: if isOwner(userId) && 
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sessionId']) &&
+                      resource.data.status == 'active';
+
+      // Admin management rules
+      allow create: if isAuthenticated() && 
+                      isValidUser(request.resource.data) &&
+                      (
+                        (isOwner(userId) && request.resource.data.role == 'user' && request.resource.data.status == 'active') ||
+                        (isAdmin() && request.resource.data.role in ['user', 'admin']) ||
+                        isSuperAdmin()
+                      );
+
+      allow update: if isAuthenticated() && 
+                      isValidUser(request.resource.data) &&
+                      (
+                        // Admin can edit users and admins, but cannot change super_admin
+                        (isAdmin() && resource.data.role in ['user', 'admin'] && request.resource.data.role in ['user', 'admin']) ||
+                        isSuperAdmin()
+                      );
+
+      allow delete: if isAuthenticated() && 
+                      (
+                        // Admin can only delete regular users
+                        (isAdmin() && resource.data.role == 'user') ||
+                        // Super Admin can delete admins too
+                        (isSuperAdmin() && resource.data.role in ['user', 'admin'])
+                      );
+    }
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "entities": {
+    "Report": {
+      "title": "Report",
+      "description": "A report of a traffic event in Cartagena with expiration and verification logic.",
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["transit_checkpoint", "police_presence", "traffic_flow"],
+          "description": "The type of traffic event."
+        },
+        "location": {
+          "type": "object",
+          "properties": {
+            "latitude": { "type": "number" },
+            "longitude": { "type": "number" }
+          },
+          "required": ["latitude", "longitude"]
+        },
+        "description": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "reporterUid": { "type": "string" },
+        "reporterName": { "type": "string" },
+        "reporterKarma": { "type": "integer" },
+        "status": { "type": "string", "enum": ["active", "resolved", "expired"] },
+        "confirmations": { 
+          "type": "array", 
+          "items": { "type": "string" },
+          "description": "List of user UIDs who confirmed the report still exists."
+        },
+        "dismissals": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of user UIDs who reported it's no longer there."
+        }
+      },
+      "required": ["type", "location", "timestamp", "expiresAt", "reporterUid", "status"]
+    },
+    "User": {
+      "title": "User",
+      "description": "A user of the application with role-based access and karma.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { 
+          "type": "string", 
+          "enum": ["user", "admin", "super_admin"],
+          "description": "The user's role in the system."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "disabled"],
+          "description": "Whether the user is currently allowed to log in."
+        },
+        "sessionId": {
+          "type": "string"
+        },
+        "karma": { "type": "integer", "default": 0 }
+      },
+      "required": ["uid", "email", "role", "status"]
+    }
+  },
+  "firestore": {
+    "/reports/{reportId}": {
+      "schema": "Report",
+      "description": "Collection of all traffic reports."
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Collection of user profiles."
+    }
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "name": "Cartagena Movilidad",
+  "description": "Reporte en tiempo real de movilidad, retenes de tránsito y estado de las vías en Cartagena.",
+  "requestFramePermissions": ["geolocation"]
+}
