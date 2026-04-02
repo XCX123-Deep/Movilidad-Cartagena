@@ -3,7 +3,9 @@ import {
   auth, 
   db, 
   googleProvider, 
-  signInWithPopup, 
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut, 
   onAuthStateChanged, 
   createUserWithEmailAndPassword,
@@ -637,6 +639,18 @@ export default function App() {
       setLoading(false);
     }, 5000);
 
+    // Manejar el resultado del redirect de Google en móvil
+    getRedirectResult(auth).then(async (result) => {
+      if (result?.user) {
+        // El usuario volvió del redirect, onAuthStateChanged lo manejará
+        console.log("Redirect login successful:", result.user.email);
+      }
+    }).catch((error) => {
+      if (error.code !== 'auth/null-user') {
+        console.error("Redirect result error:", error);
+      }
+    });
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       clearTimeout(timeout);
       try {
@@ -898,9 +912,16 @@ export default function App() {
     }
   };
 
+  const isMobileDevice = () => /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+
   const login = async () => {
     try {
-      await signInWithPopup(auth, googleProvider);
+      if (isMobileDevice()) {
+        // En móvil usar redirect para evitar errores COOP con popups
+        await signInWithRedirect(auth, googleProvider);
+      } else {
+        await signInWithPopup(auth, googleProvider);
+      }
     } catch (error) {
       console.error("Login failed", error);
     }
@@ -1268,7 +1289,7 @@ export default function App() {
         </div>
 
         {/* Map Area */}
-        <div className="flex-1 relative bg-slate-200">
+        <div className="h-[55vh] lg:h-auto flex-1 relative bg-slate-200">
           <MapContainer 
             center={userLocation} 
             zoom={13} 
