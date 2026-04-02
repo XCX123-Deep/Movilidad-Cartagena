@@ -636,22 +636,26 @@ export default function App() {
   const [previousLocation, setPreviousLocation] = useState<[number, number] | null>(null);
   const startYRef = React.useRef(0);
   const [approachingReport, setApproachingReport] = useState<Report | null>(null);
-
-  // Auto-dismiss del radar de proximidad a los 5 segundos
-  useEffect(() => {
-    if (!approachingReport) return;
-    const timer = setTimeout(() => setApproachingReport(null), 5000);
-    return () => clearTimeout(timer);
-  }, [approachingReport]);
-
-  // Estado para alerta de zona de trafico
   const [approachingTrafficZone, setApproachingTrafficZone] = useState<TrafficGroup | null>(null);
 
-  // Auto-dismiss de la alerta de trafico a los 7 segundos
+  // Refs de cooldown: guardan qué reportes/zonas ya se alertaron
+  // Se resetean cuando el usuario se aleja >1km del punto
+  const shownReportsRef = React.useRef<Map<string, number>>(new Map()); // id -> timestamp
+  const shownTrafficRef = React.useRef<Map<string, number>>(new Map()); // zoneKey -> timestamp
+  const ALERT_COOLDOWN = 5 * 60 * 1000; // 5 min antes de re-alertar la misma zona
+
+  // Auto-dismiss del radar a los 5 segundos
+  useEffect(() => {
+    if (!approachingReport) return;
+    const t = setTimeout(() => setApproachingReport(null), 5000);
+    return () => clearTimeout(t);
+  }, [approachingReport]);
+
+  // Auto-dismiss de la alerta de tráfico a los 5 segundos
   useEffect(() => {
     if (!approachingTrafficZone) return;
-    const timer = setTimeout(() => setApproachingTrafficZone(null), 7000);
-    return () => clearTimeout(timer);
+    const t = setTimeout(() => setApproachingTrafficZone(null), 5000);
+    return () => clearTimeout(t);
   }, [approachingTrafficZone]);
 
   const [showConfirmSheet, setShowConfirmSheet] = useState<Report | null>(null);
@@ -800,29 +804,34 @@ export default function App() {
           setPreviousLocation(userLocation);
           setUserLocation(newLoc);
           
-          // Radar de Proximidad
+          // Radar de Proximidad - con cooldown para no repetir alertas
           if (reports.length > 0) {
+            const now = Date.now();
+
+            // --- Retenes / Policia ---
             reports.forEach(report => {
-              if (report.status !== 'active') return;
-              
+              if (report.status !== 'active' || report.type === 'traffic_flow') return;
+              if (!report.location?.latitude) return;
+
               const dist = getDistance(newLoc[0], newLoc[1], report.location.latitude, report.location.longitude);
-              
-              // Alerta de proximidad (800m)
-              if (dist < 0.8 && dist > 0.1) {
-                // Simple heading check: if distance is decreasing
-                if (previousLocation) {
-                  const prevDist = getDistance(previousLocation[0], previousLocation[1], report.location.latitude, report.location.longitude);
-                  if (dist < prevDist) {
-                    setApproachingReport(report);
-                    // Vibration if supported
-                    if ('vibrate' in navigator) navigator.vibrate(200);
-                  }
-                }
-              } else if (dist >= 0.8) {
-                if (approachingReport?.id === report.id) setApproachingReport(null);
+
+              // Resetear cooldown cuando el usuario se aleja >1km
+              if (dist > 1.0) {
+                shownReportsRef.current.delete(report.id);
               }
 
-              // Confirmación con un toque (100m)
+              // Alerta de proximidad (800m) - solo si no se alertó recientemente
+              if (dist < 0.8 && dist > 0.1 && previousLocation) {
+                const prevDist = getDistance(previousLocation[0], previousLocation[1], report.location.latitude, report.location.longitude);
+                const lastShown = shownReportsRef.current.get(report.id) || 0;
+                if (dist < prevDist && (now - lastShown) > ALERT_COOLDOWN) {
+                  shownReportsRef.current.set(report.id, now);
+                  setApproachingReport(report);
+                  if ('vibrate' in navigator) navigator.vibrate(200);
+                }
+              }
+
+              // Confirmación al pasar (100m)
               if (dist < 0.1) {
                 setShowConfirmSheet(report);
               } else if (dist > 0.2) {
@@ -830,31 +839,27 @@ export default function App() {
               }
             });
 
-            // --- Deteccion de zonas de trafico (600m) ---
+            // --- Zonas de tráfico (600m) con cooldown ---
             const trafficGroups = groupTrafficReports(reports);
-            let foundTraffic = false;
             trafficGroups.forEach(group => {
+              const zoneKey = `${group.center[0].toFixed(3)},${group.center[1].toFixed(3)}`;
               const dist = getDistance(newLoc[0], newLoc[1], group.center[0], group.center[1]);
-              if (dist < 0.6 && dist > 0.05) {
-                if (previousLocation) {
-                  const prevDist = getDistance(previousLocation[0], previousLocation[1], group.center[0], group.center[1]);
-                  if (dist < prevDist) {
-                    // Solo activar si no hay ya una alerta activa para esta zona
-                    if (!approachingTrafficZone ||
-                        getDistance(approachingTrafficZone.center[0], approachingTrafficZone.center[1], group.center[0], group.center[1]) > 0.3) {
-                      setApproachingTrafficZone(group);
-                      if ('vibrate' in navigator) navigator.vibrate([100, 80, 100]);
-                    }
-                    foundTraffic = true;
-                  }
+
+              // Resetear cooldown cuando se aleja >1km
+              if (dist > 1.0) {
+                shownTrafficRef.current.delete(zoneKey);
+              }
+
+              if (dist < 0.6 && dist > 0.05 && previousLocation) {
+                const prevDist = getDistance(previousLocation[0], previousLocation[1], group.center[0], group.center[1]);
+                const lastShown = shownTrafficRef.current.get(zoneKey) || 0;
+                if (dist < prevDist && (now - lastShown) > ALERT_COOLDOWN) {
+                  shownTrafficRef.current.set(zoneKey, now);
+                  setApproachingTrafficZone(group);
+                  if ('vibrate' in navigator) navigator.vibrate([80, 60, 80]);
                 }
               }
             });
-            if (!foundTraffic && trafficGroups.every(g =>
-              getDistance(newLoc[0], newLoc[1], g.center[0], g.center[1]) >= 0.6
-            )) {
-              setApproachingTrafficZone(null);
-            }
           }
         },
         () => console.log("Geolocation denied"),
@@ -862,7 +867,7 @@ export default function App() {
       );
       return () => navigator.geolocation.clearWatch(watchId);
     }
-  }, [reports, userLocation, previousLocation, approachingReport, showConfirmSheet, approachingTrafficZone]);
+  }, [reports, previousLocation, showConfirmSheet]);
 
   // Offline Sync
   useEffect(() => {
@@ -1442,22 +1447,19 @@ export default function App() {
             )}
           </MapContainer>
 
-          {/* Leyenda de colores de trafico */}
-          <div className="absolute bottom-24 left-4 z-40 bg-white/90 backdrop-blur-sm rounded-2xl p-3 shadow-lg border border-slate-100">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Nivel de Tráfico</p>
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded-full bg-yellow-600 opacity-80" />
-                <span className="text-[11px] font-medium text-slate-600">Moderado (1 reporte)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded-full bg-orange-500 opacity-80" />
-                <span className="text-[11px] font-medium text-slate-600">Denso (2-4 reportes)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded-full bg-red-600 opacity-80" />
-                <span className="text-[11px] font-medium text-slate-600">Severo (5+ reportes)</span>
-              </div>
+          {/* Leyenda minimalista de trafico - solo 3 dots */}
+          <div className="absolute bottom-5 left-4 z-40 flex gap-2 items-center bg-black/30 backdrop-blur-sm rounded-full px-3 py-1.5">
+            <div className="flex items-center gap-1">
+              <div className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
+              <span className="text-[10px] text-white font-medium">Mod.</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-2.5 h-2.5 rounded-full bg-orange-500" />
+              <span className="text-[10px] text-white font-medium">Denso</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+              <span className="text-[10px] text-white font-medium">Severo</span>
             </div>
           </div>
 
@@ -1496,84 +1498,70 @@ export default function App() {
             )}
           </AnimatePresence>
 
-          {/* Radar Banner */}
+          {/* Toast compacto - Radar de Proximidad (esquina inferior derecha) */}
           <AnimatePresence>
             {approachingReport && (
-              <motion.div 
-                initial={{ y: -100, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{ y: -100, opacity: 0 }}
-                className="absolute top-24 left-1/2 -translate-x-1/2 z-[100] w-[90%] max-w-md"
+              <motion.div
+                initial={{ x: 120, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                exit={{ x: 120, opacity: 0 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+                className="absolute bottom-20 right-4 z-[100] w-64"
               >
-                <div className="bg-white/90 backdrop-blur-md border border-blue-100 rounded-2xl p-4 shadow-2xl flex items-center gap-4">
-                  <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center shrink-0">
-                    <ShieldAlert className="w-6 h-6 text-blue-600 animate-bounce" />
+                <div className="bg-white/95 backdrop-blur-md border border-blue-100 rounded-xl p-3 shadow-xl flex items-center gap-3">
+                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center shrink-0">
+                    <ShieldAlert className="w-4 h-4 text-blue-600" />
                   </div>
-                  <div className="flex-grow">
-                    <div className="text-xs font-bold text-blue-600 uppercase tracking-wider">Radar de Proximidad</div>
-                    <div className="font-bold text-slate-900">
-                      {approachingReport.type === 'transit_checkpoint' ? 'Retén de Tránsito' : 
-                       approachingReport.type === 'police_presence' ? 'Presencia Policial' : 'Tráfico Lento'}
+                  <div className="flex-grow min-w-0">
+                    <div className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Radar</div>
+                    <div className="font-semibold text-slate-900 text-xs truncate">
+                      {approachingReport.type === 'transit_checkpoint' ? 'Retén adelante' :
+                       approachingReport.type === 'police_presence' ? 'Policía en la vía' : 'Tráfico lento'}
                     </div>
-                    <div className="text-xs text-slate-500">A menos de 800 metros adelante</div>
+                    <div className="text-[10px] text-slate-400">~800m</div>
                   </div>
+                  <button onClick={() => setApproachingReport(null)} className="text-slate-300 hover:text-slate-500 text-xs shrink-0">✕</button>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* Alerta de Zona de Trafico (tipo Waze) */}
+          {/* Toast compacto - Zona de Trafico (aparece sobre el radar) */}
           <AnimatePresence>
             {approachingTrafficZone && (
               <motion.div
-                initial={{ y: 100, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{ y: 100, opacity: 0 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                className="absolute bottom-32 left-1/2 -translate-x-1/2 z-[100] w-[92%] max-w-md"
+                initial={{ x: 120, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                exit={{ x: 120, opacity: 0 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+                className="absolute bottom-36 right-4 z-[100] w-64"
               >
-                <div className={`backdrop-blur-md border rounded-2xl p-4 shadow-2xl flex items-center gap-4 ${
-                  approachingTrafficZone.count >= 5
-                    ? 'bg-red-50/95 border-red-200'
-                    : approachingTrafficZone.count >= 2
-                    ? 'bg-orange-50/95 border-orange-200'
-                    : 'bg-yellow-50/95 border-yellow-200'
+                <div className={`backdrop-blur-md border rounded-xl p-3 shadow-xl flex items-center gap-3 ${
+                  approachingTrafficZone.count >= 5 ? 'bg-red-50/95 border-red-200'
+                  : approachingTrafficZone.count >= 2 ? 'bg-orange-50/95 border-orange-200'
+                  : 'bg-yellow-50/95 border-yellow-200'
                 }`}>
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-base ${
                     approachingTrafficZone.count >= 5 ? 'bg-red-100'
                     : approachingTrafficZone.count >= 2 ? 'bg-orange-100'
                     : 'bg-yellow-100'
                   }`}>
-                    <span className="text-2xl animate-pulse">
-                      {approachingTrafficZone.count >= 5 ? '🔴' : approachingTrafficZone.count >= 2 ? '🟠' : '🟡'}
-                    </span>
+                    {approachingTrafficZone.count >= 5 ? '🔴' : approachingTrafficZone.count >= 2 ? '🟠' : '🟡'}
                   </div>
-                  <div className="flex-grow">
-                    <div className={`text-xs font-bold uppercase tracking-wider ${
+                  <div className="flex-grow min-w-0">
+                    <div className={`text-[10px] font-bold uppercase tracking-wider ${
                       approachingTrafficZone.count >= 5 ? 'text-red-600'
-                      : approachingTrafficZone.count >= 2 ? 'text-orange-600'
-                      : 'text-yellow-700'
+                      : approachingTrafficZone.count >= 2 ? 'text-orange-600' : 'text-yellow-700'
                     }`}>
-                      {approachingTrafficZone.count >= 5 ? 'Tráfico Severo' :
-                       approachingTrafficZone.count >= 2 ? 'Tráfico Denso' : 'Tráfico Moderado'}
+                      {approachingTrafficZone.count >= 5 ? 'Tráfico Severo'
+                      : approachingTrafficZone.count >= 2 ? 'Tráfico Denso' : 'Tráfico Moderado'}
                     </div>
-                    <div className="font-bold text-slate-900 text-sm">
-                      {approachingTrafficZone.count >= 5
-                        ? 'Congestinón severa adelante. Se recomienda ruta alternativa.'
-                        : approachingTrafficZone.count >= 2
-                        ? 'Tráfico denso en la zona. Se recomienda uso de vías alternas.'
-                        : 'Tráfico moderado en la zona. Precaución al avanzar.'}
+                    <div className="text-[11px] font-semibold text-slate-800 leading-tight">
+                      {approachingTrafficZone.count >= 2 ? 'Considera vías alternas' : 'Precaución al avanzar'}
                     </div>
-                    <div className="text-xs text-slate-500 mt-0.5">
-                      {approachingTrafficZone.count} {approachingTrafficZone.count === 1 ? 'reporte' : 'reportes'} · a menos de 600m
-                    </div>
+                    <div className="text-[10px] text-slate-400">{approachingTrafficZone.count} rep. · ~600m</div>
                   </div>
-                  <button
-                    onClick={() => setApproachingTrafficZone(null)}
-                    className="text-slate-400 hover:text-slate-600 shrink-0 p-1"
-                  >
-                    ✕
-                  </button>
+                  <button onClick={() => setApproachingTrafficZone(null)} className="text-slate-300 hover:text-slate-500 text-xs shrink-0">✕</button>
                 </div>
               </motion.div>
             )}
