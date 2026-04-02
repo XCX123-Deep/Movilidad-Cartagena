@@ -489,6 +489,81 @@ const haptic = (type: 'short' | 'double' | 'error') => {
   }
 };
 
+// --- Funciones de distancia (módulo-nivel) ---
+const deg2rad = (deg: number) => deg * (Math.PI / 180);
+
+const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+  const R = 6371;
+  const dLat = deg2rad(lat2 - lat1);
+  const dLon = deg2rad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+// --- Trfico tipo Waze ---
+interface TrafficGroup {
+  center: [number, number];
+  count: number;
+  representative: Report;
+}
+
+const groupTrafficReports = (reports: Report[]): TrafficGroup[] => {
+  const traffic = reports.filter(
+    r => r.type === 'traffic_flow' && r.status === 'active' && r.location?.latitude
+  );
+  const assigned = new Set<string>();
+  const groups: TrafficGroup[] = [];
+
+  traffic.forEach(report => {
+    if (assigned.has(report.id)) return;
+    const cluster = traffic.filter(r => {
+      if (assigned.has(r.id)) return false;
+      return getDistance(
+        report.location.latitude, report.location.longitude,
+        r.location.latitude, r.location.longitude
+      ) < 0.3; // 300 metros
+    });
+    cluster.forEach(r => assigned.add(r.id));
+    const avgLat = cluster.reduce((s, r) => s + r.location.latitude, 0) / cluster.length;
+    const avgLng = cluster.reduce((s, r) => s + r.location.longitude, 0) / cluster.length;
+    groups.push({ center: [avgLat, avgLng], count: cluster.length, representative: cluster[0] });
+  });
+  return groups;
+};
+
+const TrafficCircle = ({ group, onSelect }: { group: TrafficGroup; onSelect: (r: Report) => void; key?: string }) => {
+  // Amarillo -> Naranja -> Rojo según intensidad
+  const color = group.count >= 5 ? '#DC2626'   // Rojo: tráfico severo
+              : group.count >= 3 ? '#EA580C'   // Naranja: tráfico denso
+              : group.count >= 2 ? '#F97316'   // Naranja claro
+              : '#CA8A04';                      // Amarillo: tráfico moderado
+  const radius = Math.min(100 + group.count * 80, 500);
+  const fillOpacity = Math.min(0.25 + group.count * 0.06, 0.55);
+
+  return (
+    <Circle
+      center={group.center}
+      radius={radius}
+      pathOptions={{
+        fillColor: color,
+        fillOpacity,
+        color,
+        weight: 3,
+        opacity: 0.85
+      }}
+      eventHandlers={{
+        click: () => {
+          haptic('short');
+          onSelect(group.representative);
+        }
+      }}
+    />
+  );
+};
+
 const ReportMarker = ({ report, onConfirm, onSelect }: { report: Report, onConfirm: (id: string, still: boolean) => Promise<void> | void, onSelect: (report: Report) => void, key?: string }) => {
   const [opacity, setOpacity] = useState(1);
 
@@ -783,21 +858,7 @@ export default function App() {
     };
   }, [offlineQueue]);
 
-  const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371; // Radius of the earth in km
-    const dLat = deg2rad(lat2 - lat1);
-    const dLon = deg2rad(lon2 - lon1);
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2)
-      ; 
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
-    const d = R * c; // Distance in km
-    return d;
-  };
-
-  const deg2rad = (deg: number) => deg * (Math.PI/180);
+  // getDistance y deg2rad ahora son funciones de módulo (ver arriba)
 
   const startVoiceReporting = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -1304,31 +1365,65 @@ export default function App() {
             <RecenterMap center={userLocation} />
             <UserLocationMarker position={userLocation} />
             {!showHeatmap ? (
-              <MarkerClusterGroup chunkedLoading>
-                {debouncedReports.map((report) => (
-                  <ReportMarker 
-                    key={report.id} 
-                    report={report} 
-                    onConfirm={handleConfirmReport} 
+              <>
+                {/* Retenes y Policia -> Marcadores con clustering */}
+                <MarkerClusterGroup chunkedLoading>
+                  {debouncedReports
+                    .filter(r => r.type !== 'traffic_flow')
+                    .map((report) => (
+                      <ReportMarker
+                        key={report.id}
+                        report={report}
+                        onConfirm={handleConfirmReport}
+                        onSelect={(r) => setSelectedReport(r)}
+                      />
+                    ))}
+                </MarkerClusterGroup>
+                {/* Trafico lento -> Circulos de color tipo Waze */}
+                {groupTrafficReports(debouncedReports).map((group, i) => (
+                  <TrafficCircle
+                    key={`traffic-${i}`}
+                    group={group}
                     onSelect={(r) => setSelectedReport(r)}
                   />
                 ))}
-              </MarkerClusterGroup>
+              </>
             ) : (
-              historicalReports.map((report) => (
-                <Circle 
-                  key={report.id}
-                  center={[report.location.latitude, report.location.longitude]}
-                  radius={100}
-                  pathOptions={{ 
-                    fillColor: report.type === 'transit_checkpoint' ? 'red' : 'orange', 
-                    fillOpacity: 0.1,
-                    color: 'transparent'
-                  }}
-                />
-              ))
+              historicalReports
+                .filter(r => r.location?.latitude)
+                .map((report) => (
+                  <Circle
+                    key={report.id}
+                    center={[report.location.latitude, report.location.longitude]}
+                    radius={100}
+                    pathOptions={{
+                      fillColor: report.type === 'transit_checkpoint' ? 'red' : 'orange',
+                      fillOpacity: 0.1,
+                      color: 'transparent'
+                    }}
+                  />
+                ))
             )}
           </MapContainer>
+
+          {/* Leyenda de colores de trafico */}
+          <div className="absolute bottom-24 left-4 z-40 bg-white/90 backdrop-blur-sm rounded-2xl p-3 shadow-lg border border-slate-100">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Nivel de Tráfico</p>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-yellow-600 opacity-80" />
+                <span className="text-[11px] font-medium text-slate-600">Moderado (1 reporte)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-orange-500 opacity-80" />
+                <span className="text-[11px] font-medium text-slate-600">Denso (2-4 reportes)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-red-600 opacity-80" />
+                <span className="text-[11px] font-medium text-slate-600">Severo (5+ reportes)</span>
+              </div>
+            </div>
+          </div>
 
           {/* Heatmap Toggle */}
           <div className="absolute top-24 right-8 z-40">
