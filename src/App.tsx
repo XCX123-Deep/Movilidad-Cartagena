@@ -1114,7 +1114,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="h-full bg-slate-50 flex flex-col">
       {/* Header */}
       <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-50">
         <div className="flex items-center gap-6">
@@ -1179,7 +1179,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
+      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden relative min-h-0">
         {activeTab === 'users' && profile && (profile.role === 'admin' || profile.role === 'super_admin') ? (
           <div className="flex-1 overflow-y-auto bg-slate-50">
             <UserManagement currentUser={user} currentProfile={profile} />
@@ -1294,10 +1294,10 @@ export default function App() {
           </div>
         </div>
 
-        {/* Map Area - style inline obligatorio para que Leaflet calcule dimensiones en móvil */}
+        {/* Map Area - min-h-0 es clave para que flex-1 dé altura computada en móvil */}
         <div 
-          className="flex-1 relative bg-slate-200"
-          style={{ height: window.innerWidth < 1024 ? '55vh' : '100%', minHeight: '300px' }}
+          className="flex-1 relative bg-slate-200 min-h-0"
+          style={{ minHeight: '250px' }}
         >
           <MapContainer 
             center={userLocation} 
@@ -1652,14 +1652,23 @@ export default function App() {
                     <button 
                       onClick={() => {
                         haptic('short');
-                        if (navigator.geolocation) {
-                          navigator.geolocation.getCurrentPosition((pos) => {
+                        if (!navigator.geolocation) {
+                          alert('Tu dispositivo no soporta geolocalización.');
+                          return;
+                        }
+                        navigator.geolocation.getCurrentPosition(
+                          (pos) => {
                             const lat = pos.coords.latitude;
                             const lng = pos.coords.longitude;
                             setUserLocation([lat, lng]);
                             setNewReport(prev => ({ ...prev, latitude: lat, longitude: lng }));
-                          });
-                        }
+                          },
+                          (err) => {
+                            console.error('Geolocation error:', err);
+                            alert('No se pudo obtener tu ubicación. Asegúrate de haber dado permiso de ubicación al navegador y que HTTPS esté activo.');
+                          },
+                          { enableHighAccuracy: true, timeout: 10000 }
+                        );
                       }}
                       className="text-sm text-blue-600 font-black hover:underline flex items-center gap-1"
                     >
