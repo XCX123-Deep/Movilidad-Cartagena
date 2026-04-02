@@ -110,9 +110,15 @@ const RecenterMap = ({ center }: { center: [number, number] }) => {
 const MapResizer = () => {
   const map = useMapEvents({});
   useEffect(() => {
-    setTimeout(() => {
-      map.invalidateSize();
-    }, 100);
+    // Llamar invalidateSize varias veces con delays progresivos
+    // para garantizar que Leaflet recalcule el tamaño correctamente en móvil
+    const timers = [
+      setTimeout(() => map.invalidateSize(), 100),
+      setTimeout(() => map.invalidateSize(), 300),
+      setTimeout(() => map.invalidateSize(), 600),
+      setTimeout(() => map.invalidateSize(), 1000),
+    ];
+    return () => timers.forEach(clearTimeout);
   }, [map]);
   return null;
 };
@@ -1288,17 +1294,22 @@ export default function App() {
           </div>
         </div>
 
-        {/* Map Area */}
-        <div className="h-[55vh] lg:h-auto flex-1 relative bg-slate-200">
+        {/* Map Area - style inline obligatorio para que Leaflet calcule dimensiones en móvil */}
+        <div 
+          className="flex-1 relative bg-slate-200"
+          style={{ height: window.innerWidth < 1024 ? '55vh' : '100%', minHeight: '300px' }}
+        >
           <MapContainer 
             center={userLocation} 
             zoom={13} 
             className="w-full h-full z-0"
+            style={{ height: '100%', width: '100%' }}
           >
             <TileLayer
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             />
+            <MapResizer />
             <RecenterMap center={userLocation} />
             <UserLocationMarker position={userLocation} />
             {!showHeatmap ? (
