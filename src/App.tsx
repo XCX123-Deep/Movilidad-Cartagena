@@ -644,6 +644,16 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [approachingReport]);
 
+  // Estado para alerta de zona de trafico
+  const [approachingTrafficZone, setApproachingTrafficZone] = useState<TrafficGroup | null>(null);
+
+  // Auto-dismiss de la alerta de trafico a los 7 segundos
+  useEffect(() => {
+    if (!approachingTrafficZone) return;
+    const timer = setTimeout(() => setApproachingTrafficZone(null), 7000);
+    return () => clearTimeout(timer);
+  }, [approachingTrafficZone]);
+
   const [showConfirmSheet, setShowConfirmSheet] = useState<Report | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [offlineQueue, setOfflineQueue] = useState<Partial<Report>[]>([]);
@@ -819,6 +829,32 @@ export default function App() {
                 if (showConfirmSheet?.id === report.id) setShowConfirmSheet(null);
               }
             });
+
+            // --- Deteccion de zonas de trafico (600m) ---
+            const trafficGroups = groupTrafficReports(reports);
+            let foundTraffic = false;
+            trafficGroups.forEach(group => {
+              const dist = getDistance(newLoc[0], newLoc[1], group.center[0], group.center[1]);
+              if (dist < 0.6 && dist > 0.05) {
+                if (previousLocation) {
+                  const prevDist = getDistance(previousLocation[0], previousLocation[1], group.center[0], group.center[1]);
+                  if (dist < prevDist) {
+                    // Solo activar si no hay ya una alerta activa para esta zona
+                    if (!approachingTrafficZone ||
+                        getDistance(approachingTrafficZone.center[0], approachingTrafficZone.center[1], group.center[0], group.center[1]) > 0.3) {
+                      setApproachingTrafficZone(group);
+                      if ('vibrate' in navigator) navigator.vibrate([100, 80, 100]);
+                    }
+                    foundTraffic = true;
+                  }
+                }
+              }
+            });
+            if (!foundTraffic && trafficGroups.every(g =>
+              getDistance(newLoc[0], newLoc[1], g.center[0], g.center[1]) >= 0.6
+            )) {
+              setApproachingTrafficZone(null);
+            }
           }
         },
         () => console.log("Geolocation denied"),
@@ -826,7 +862,7 @@ export default function App() {
       );
       return () => navigator.geolocation.clearWatch(watchId);
     }
-  }, [reports, userLocation, previousLocation, approachingReport, showConfirmSheet]);
+  }, [reports, userLocation, previousLocation, approachingReport, showConfirmSheet, approachingTrafficZone]);
 
   // Offline Sync
   useEffect(() => {
@@ -1481,6 +1517,63 @@ export default function App() {
                     </div>
                     <div className="text-xs text-slate-500">A menos de 800 metros adelante</div>
                   </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Alerta de Zona de Trafico (tipo Waze) */}
+          <AnimatePresence>
+            {approachingTrafficZone && (
+              <motion.div
+                initial={{ y: 100, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 100, opacity: 0 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                className="absolute bottom-32 left-1/2 -translate-x-1/2 z-[100] w-[92%] max-w-md"
+              >
+                <div className={`backdrop-blur-md border rounded-2xl p-4 shadow-2xl flex items-center gap-4 ${
+                  approachingTrafficZone.count >= 5
+                    ? 'bg-red-50/95 border-red-200'
+                    : approachingTrafficZone.count >= 2
+                    ? 'bg-orange-50/95 border-orange-200'
+                    : 'bg-yellow-50/95 border-yellow-200'
+                }`}>
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
+                    approachingTrafficZone.count >= 5 ? 'bg-red-100'
+                    : approachingTrafficZone.count >= 2 ? 'bg-orange-100'
+                    : 'bg-yellow-100'
+                  }`}>
+                    <span className="text-2xl animate-pulse">
+                      {approachingTrafficZone.count >= 5 ? '🔴' : approachingTrafficZone.count >= 2 ? '🟠' : '🟡'}
+                    </span>
+                  </div>
+                  <div className="flex-grow">
+                    <div className={`text-xs font-bold uppercase tracking-wider ${
+                      approachingTrafficZone.count >= 5 ? 'text-red-600'
+                      : approachingTrafficZone.count >= 2 ? 'text-orange-600'
+                      : 'text-yellow-700'
+                    }`}>
+                      {approachingTrafficZone.count >= 5 ? 'Tráfico Severo' :
+                       approachingTrafficZone.count >= 2 ? 'Tráfico Denso' : 'Tráfico Moderado'}
+                    </div>
+                    <div className="font-bold text-slate-900 text-sm">
+                      {approachingTrafficZone.count >= 5
+                        ? 'Congestinón severa adelante. Se recomienda ruta alternativa.'
+                        : approachingTrafficZone.count >= 2
+                        ? 'Tráfico denso en la zona. Se recomienda uso de vías alternas.'
+                        : 'Tráfico moderado en la zona. Precaución al avanzar.'}
+                    </div>
+                    <div className="text-xs text-slate-500 mt-0.5">
+                      {approachingTrafficZone.count} {approachingTrafficZone.count === 1 ? 'reporte' : 'reportes'} · a menos de 600m
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setApproachingTrafficZone(null)}
+                    className="text-slate-400 hover:text-slate-600 shrink-0 p-1"
+                  >
+                    ✕
+                  </button>
                 </div>
               </motion.div>
             )}
