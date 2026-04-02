@@ -517,6 +517,7 @@ const ReportMarker = ({ report, onConfirm, onSelect }: { report: Report, onConfi
     return () => clearInterval(interval);
   }, [report]);
 
+  if (!report.location?.latitude || !report.location?.longitude) return null;
   if (opacity <= 0 || report.status !== 'active') return null;
 
   const isVerified = (report.reporterKarma || 0) > 10 || (report.confirmations?.length || 0) >= 3;
@@ -1253,7 +1254,9 @@ export default function App() {
                       </p>
                       <div className="flex items-center gap-1 text-[10px] text-slate-400">
                         <MapPin className="w-3 h-3" />
-                        <span>{report.location.latitude.toFixed(4)}, {report.location.longitude.toFixed(4)}</span>
+                        <span>
+                          {report.location?.latitude?.toFixed(4) ?? '?'}, {report.location?.longitude?.toFixed(4) ?? '?'}
+                        </span>
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-2">
@@ -1690,7 +1693,16 @@ export default function App() {
                   <button 
                     onClick={() => {
                       haptic('short');
-                      handleSubmitReport(newReport as any);
+                      if (!newReport.latitude || !newReport.longitude) return;
+                      // Construir el objeto location correcto antes de enviar
+                      handleSubmitReport({
+                        type: newReport.type,
+                        description: newReport.description,
+                        location: {
+                          latitude: newReport.latitude,
+                          longitude: newReport.longitude
+                        }
+                      });
                     }}
                     disabled={!newReport.latitude}
                     className={`w-full py-6 rounded-[32px] font-black text-xl transition-all shadow-2xl ${
