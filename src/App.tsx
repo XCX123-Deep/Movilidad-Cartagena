@@ -1562,7 +1562,7 @@ export default function App() {
             )}
           </AnimatePresence>
 
-          {/* Toast compacto - Radar de Proximidad (esquina inferior derecha) */}
+          {/* Toast - Radar de Proximidad */}
           <AnimatePresence>
             {approachingReport && (
               <motion.div
@@ -1572,25 +1572,25 @@ export default function App() {
                 transition={{ type: 'spring', stiffness: 300, damping: 28 }}
                 className="absolute bottom-20 right-4 z-[100] w-64"
               >
-                <div className="bg-white/95 backdrop-blur-md border border-blue-100 rounded-xl p-3 shadow-xl flex items-center gap-3">
-                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center shrink-0">
-                    <ShieldAlert className="w-4 h-4 text-blue-600" />
+                <div className="glass-card border border-cyan-500/20 rounded-2xl p-3 shadow-2xl flex items-center gap-3">
+                  <div className="w-8 h-8 bg-cyan-500/15 rounded-lg flex items-center justify-center shrink-0">
+                    <ShieldAlert className="w-4 h-4 text-cyan-400" />
                   </div>
                   <div className="flex-grow min-w-0">
-                    <div className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Radar</div>
-                    <div className="font-semibold text-slate-900 text-xs truncate">
+                    <div className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider">Radar</div>
+                    <div className="font-semibold text-white text-xs truncate">
                       {approachingReport.type === 'transit_checkpoint' ? 'Retén adelante' :
                        approachingReport.type === 'police_presence' ? 'Policía en la vía' : 'Tráfico lento'}
                     </div>
-                    <div className="text-[10px] text-slate-400">~800m</div>
+                    <div className="text-[10px] text-slate-500">~800m</div>
                   </div>
-                  <button onClick={() => setApproachingReport(null)} className="text-slate-300 hover:text-slate-500 text-xs shrink-0">✕</button>
+                  <button onClick={() => setApproachingReport(null)} className="text-slate-600 hover:text-slate-300 text-xs shrink-0">✕</button>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* Toast compacto - Zona de Trafico (aparece sobre el radar) */}
+          {/* Toast - Zona de Trafico */}
           <AnimatePresence>
             {approachingTrafficZone && (
               <motion.div
@@ -1600,134 +1600,139 @@ export default function App() {
                 transition={{ type: 'spring', stiffness: 300, damping: 28 }}
                 className="absolute bottom-36 right-4 z-[100] w-64"
               >
-                <div className={`backdrop-blur-md border rounded-xl p-3 shadow-xl flex items-center gap-3 ${
-                  approachingTrafficZone.count >= 5 ? 'bg-red-50/95 border-red-200'
-                  : approachingTrafficZone.count >= 2 ? 'bg-orange-50/95 border-orange-200'
-                  : 'bg-yellow-50/95 border-yellow-200'
+                <div className={`glass-card border rounded-2xl p-3 shadow-2xl flex items-center gap-3 ${
+                  approachingTrafficZone.count >= 5 ? 'border-red-500/30'
+                  : approachingTrafficZone.count >= 2 ? 'border-orange-500/30'
+                  : 'border-yellow-500/30'
                 }`}>
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-base ${
-                    approachingTrafficZone.count >= 5 ? 'bg-red-100'
-                    : approachingTrafficZone.count >= 2 ? 'bg-orange-100'
-                    : 'bg-yellow-100'
+                    approachingTrafficZone.count >= 5 ? 'bg-red-500/15'
+                    : approachingTrafficZone.count >= 2 ? 'bg-orange-500/15'
+                    : 'bg-yellow-500/15'
                   }`}>
                     {approachingTrafficZone.count >= 5 ? '🔴' : approachingTrafficZone.count >= 2 ? '🟠' : '🟡'}
                   </div>
                   <div className="flex-grow min-w-0">
                     <div className={`text-[10px] font-bold uppercase tracking-wider ${
-                      approachingTrafficZone.count >= 5 ? 'text-red-600'
-                      : approachingTrafficZone.count >= 2 ? 'text-orange-600' : 'text-yellow-700'
+                      approachingTrafficZone.count >= 5 ? 'text-red-400'
+                      : approachingTrafficZone.count >= 2 ? 'text-orange-400' : 'text-yellow-400'
                     }`}>
                       {approachingTrafficZone.count >= 5 ? 'Tráfico Severo'
                       : approachingTrafficZone.count >= 2 ? 'Tráfico Denso' : 'Tráfico Moderado'}
                     </div>
-                    <div className="text-[11px] font-semibold text-slate-800 leading-tight">
+                    <div className="text-[11px] font-semibold text-slate-300 leading-tight">
                       {approachingTrafficZone.count >= 2 ? 'Considera vías alternas' : 'Precaución al avanzar'}
                     </div>
-                    <div className="text-[10px] text-slate-400">{approachingTrafficZone.count} rep. · ~600m</div>
+                    <div className="text-[10px] text-slate-600">{approachingTrafficZone.count} rep. · ~600m</div>
                   </div>
-                  <button onClick={() => setApproachingTrafficZone(null)} className="text-slate-300 hover:text-slate-500 text-xs shrink-0">✕</button>
+                  <button onClick={() => setApproachingTrafficZone(null)} className="text-slate-600 hover:text-slate-300 text-xs shrink-0">✕</button>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* Report Detail Sheet */}
+          {/* Report Detail Sheet - Dark Premium */}
           <AnimatePresence>
             {selectedReport && (
               <>
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   onClick={() => setSelectedReport(null)}
-                  className="absolute inset-0 bg-black/20 z-[90] backdrop-blur-[2px]"
+                  className="absolute inset-0 bg-black/60 z-[90] backdrop-blur-sm"
                 />
-                <motion.div 
+                <motion.div
                   initial={{ y: '100%' }}
                   animate={{ y: 0 }}
                   exit={{ y: '100%' }}
-                  transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                  className="absolute bottom-0 left-0 right-0 z-[100] p-4"
+                  transition={{ type: 'spring', damping: 28, stiffness: 220 }}
+                  className="absolute bottom-0 left-0 right-0 z-[100]"
                 >
-                  <div className="bg-white rounded-t-3xl shadow-2xl p-6 border-t border-slate-100 max-w-2xl mx-auto">
-                    <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6" />
-                    
-                    <div className="flex items-center gap-4 mb-6">
-                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
-                        selectedReport.type === 'transit_checkpoint' ? 'bg-amber-100 text-amber-600' :
-                        selectedReport.type === 'police_presence' ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-600'
+                  <div
+                    className="rounded-t-[32px] p-6 max-w-2xl mx-auto shadow-2xl"
+                    style={{ background: 'rgba(15,23,42,0.97)', backdropFilter: 'blur(40px)', border: '1px solid rgba(255,255,255,0.08)' }}
+                  >
+                    {/* Handle */}
+                    <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-6" />
+
+                    {/* Header */}
+                    <div className="flex items-center gap-4 mb-5">
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 ${
+                        selectedReport.type === 'transit_checkpoint' ? 'bg-amber-500/15 text-amber-400'
+                        : selectedReport.type === 'police_presence' ? 'bg-blue-500/15 text-blue-400'
+                        : 'bg-red-500/15 text-red-400'
                       }`}>
                         <ReportTypeIcon type={selectedReport.type} className="w-8 h-8" />
                       </div>
                       <div className="flex-grow">
-                        <h3 className="text-xl font-bold text-slate-900">{ReportTypeName(selectedReport.type)}</h3>
-                        <div className="flex items-center gap-2 text-sm text-slate-500">
-                          <Clock className="w-4 h-4" />
+                        <h3 className="text-xl font-black text-white">{ReportTypeName(selectedReport.type)}</h3>
+                        <div className="flex items-center gap-1.5 text-sm text-slate-500 mt-0.5">
+                          <Clock className="w-3.5 h-3.5" />
                           {selectedReport.timestamp?.toDate ? formatDistanceToNow(selectedReport.timestamp.toDate(), { addSuffix: true, locale: es }) : 'Recién'}
                         </div>
                       </div>
-                      <button 
+                      <button
                         onClick={() => setSelectedReport(null)}
-                        className="p-2 hover:bg-slate-100 rounded-full"
+                        className="p-2 hover:bg-white/10 rounded-full transition-colors"
                       >
-                        <X className="w-6 h-6 text-slate-400" />
+                        <X className="w-5 h-5 text-slate-500" />
                       </button>
                     </div>
 
+                    {/* Description */}
                     {selectedReport.description && (
-                      <div className="bg-slate-50 p-4 rounded-2xl mb-6">
-                        <p className="text-slate-700 italic">"{selectedReport.description}"</p>
+                      <div className="bg-white/5 border border-white/8 p-4 rounded-2xl mb-5">
+                        <p className="text-slate-300 italic text-sm leading-relaxed">"{selectedReport.description}"</p>
                       </div>
                     )}
 
-                    <div className="flex items-center justify-between p-4 bg-blue-50 rounded-2xl mb-8">
+                    {/* Reporter Card */}
+                    <div className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-600/10 to-indigo-600/10 border border-blue-500/20 rounded-2xl mb-5">
                       <div className="flex items-center gap-3">
-                        <img 
-                          src={`https://ui-avatars.com/api/?name=${selectedReport.reporterName}&background=random`} 
-                          className="w-10 h-10 rounded-full border-2 border-white shadow-sm" 
-                          alt="" 
+                        <img
+                          src={`https://ui-avatars.com/api/?name=${selectedReport.reporterName}&background=1e3a5f&color=38bdf8`}
+                          className="w-10 h-10 rounded-full border-2 border-cyan-500/30 shadow-sm"
+                          alt=""
                         />
                         <div>
-                          <div className="font-bold text-slate-900 flex items-center gap-1">
+                          <div className="font-bold text-white flex items-center gap-1.5">
                             {selectedReport.reporterName}
                             {((selectedReport.reporterKarma || 0) > 10 || (selectedReport.confirmations?.length || 0) >= 3) && (
-                              <CheckCircle className="w-4 h-4 text-blue-500" />
+                              <CheckCircle className="w-4 h-4 text-cyan-400" />
                             )}
                           </div>
                           {((selectedReport.reporterKarma || 0) > 10 || (selectedReport.confirmations?.length || 0) >= 3) && (
-                            <div className="text-[10px] uppercase font-bold text-blue-600 tracking-wider">Reportero Confiable</div>
+                            <div className="text-[10px] uppercase font-bold text-cyan-400 tracking-wider">Reportero Confiable</div>
                           )}
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-lg font-black text-blue-600 leading-none">{selectedReport.reporterKarma || 0}</div>
-                        <div className="text-[10px] font-bold text-slate-400 uppercase">Karma</div>
+                        <div className="text-xl font-black gradient-text leading-none">{selectedReport.reporterKarma || 0}</div>
+                        <div className="text-[10px] font-bold text-slate-500 uppercase">Karma</div>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <button 
-                        onClick={() => {
-                          handleConfirmReport(selectedReport.id, true);
-                          setSelectedReport(null);
-                        }}
-                        className="bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all shadow-lg shadow-green-100"
+                    {/* Action Buttons */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <motion.button
+                        whileTap={{ scale: 0.96 }}
+                        onClick={() => { handleConfirmReport(selectedReport.id, true); setSelectedReport(null); }}
+                        className="bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 font-bold py-4 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all"
                       >
                         <CheckCircle className="w-6 h-6" />
                         <span>Sigue ahí</span>
-                        <span className="text-[10px] opacity-80">({selectedReport.confirmations?.length || 0} confirmaciones)</span>
-                      </button>
-                      <button 
-                        onClick={() => {
-                          handleConfirmReport(selectedReport.id, false);
-                          setSelectedReport(null);
-                        }}
-                        className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-4 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all"
+                        <span className="text-[10px] opacity-70">({selectedReport.confirmations?.length || 0} confirmaciones)</span>
+                      </motion.button>
+                      <motion.button
+                        whileTap={{ scale: 0.96 }}
+                        onClick={() => { handleConfirmReport(selectedReport.id, false); setSelectedReport(null); }}
+                        className="bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 font-bold py-4 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all"
                       >
                         <X className="w-6 h-6" />
                         <span>Ya no está</span>
-                        <span className="text-[10px] opacity-80">({selectedReport.dismissals?.length || 0} reportes)</span>
-                      </button>
+                        <span className="text-[10px] opacity-70">({selectedReport.dismissals?.length || 0} reportes)</span>
+                      </motion.button>
                     </div>
                   </div>
                 </motion.div>
@@ -1735,32 +1740,43 @@ export default function App() {
             )}
           </AnimatePresence>
 
-          {/* Confirm Sheet */}
+          {/* Confirm Sheet - Dark Premium */}
           <AnimatePresence>
             {showConfirmSheet && (
-              <motion.div 
+              <motion.div
                 initial={{ y: '100%' }}
                 animate={{ y: 0 }}
                 exit={{ y: '100%' }}
-                className="absolute bottom-0 left-0 right-0 z-[100] p-4"
+                transition={{ type: 'spring', damping: 28, stiffness: 220 }}
+                className="absolute bottom-0 left-0 right-0 z-[100]"
               >
-                <div className="bg-white rounded-t-3xl shadow-2xl p-6 border-t border-slate-100">
-                  <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6" />
-                  <h3 className="text-xl font-bold text-slate-900 mb-2 text-center">¿Sigue el reporte aquí?</h3>
-                  <p className="text-slate-500 text-center mb-8">Ayuda a la comunidad confirmando la veracidad del dato.</p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <button 
+                <div
+                  className="rounded-t-[32px] p-6 max-w-2xl mx-auto shadow-2xl"
+                  style={{ background: 'rgba(15,23,42,0.97)', backdropFilter: 'blur(40px)', border: '1px solid rgba(255,255,255,0.08)' }}
+                >
+                  <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-6" />
+                  <div className="text-center mb-6">
+                    <div className="w-14 h-14 bg-cyan-500/10 border border-cyan-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                      <ShieldAlert className="w-7 h-7 text-cyan-400" />
+                    </div>
+                    <h3 className="text-xl font-black text-white mb-1">¿Sigue el reporte aquí?</h3>
+                    <p className="text-slate-500 text-sm">Ayuda a la comunidad confirmando la veracidad del dato.</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <motion.button
+                      whileTap={{ scale: 0.96 }}
                       onClick={() => handleConfirmReport(showConfirmSheet.id, true)}
-                      className="bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 transition-all"
+                      className="bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 font-bold py-4 rounded-2xl flex items-center justify-center gap-2 transition-all"
                     >
                       <CheckCircle className="w-5 h-5" /> Sigue ahí
-                    </button>
-                    <button 
+                    </motion.button>
+                    <motion.button
+                      whileTap={{ scale: 0.96 }}
                       onClick={() => handleConfirmReport(showConfirmSheet.id, false)}
-                      className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-4 rounded-2xl flex items-center justify-center gap-2 transition-all"
+                      className="bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 font-bold py-4 rounded-2xl flex items-center justify-center gap-2 transition-all"
                     >
                       <X className="w-5 h-5" /> Ya no está
-                    </button>
+                    </motion.button>
                   </div>
                 </div>
               </motion.div>
