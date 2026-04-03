@@ -102,41 +102,16 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
+      // Cualquier usuario autenticado puede leer perfiles
       allow read: if isAuthenticated();
 
+      // Un usuario puede crear o actualizar su PROPIO documento libremente
+      // (registro, sesión, primer login, etc.)
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) || isAdmin() || isSuperAdmin();
 
-      // Cualquier usuario autenticado puede crear SU PROPIO documento
-      // (primer login: se crea con status 'pending' o 'active' si es el owner)
-      allow create: if isAuthenticated() &&
-                      isValidUser(request.resource.data) &&
-                      (
-                        // Self-create: el usuario crea su propio doc (primer login)
-                        (isOwner(userId) && request.resource.data.role == 'user') ||
-                        // Owner email auto-creates as super_admin
-                        (isOwner(userId) && request.auth.token.email == "juniorborre011@gmail.com") ||
-                        // Admin crea usuarios con acceso directo
-                        (isAdmin() && request.resource.data.role in ['user', 'admin']) ||
-                        isSuperAdmin()
-                      );
-
-      allow update: if isAuthenticated() &&
-                      isValidUser(request.resource.data) &&
-                      (
-                        // El usuario puede actualizar su propio sessionId
-                        (isOwner(userId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sessionId'])) ||
-                        // Admin aprueba/desactiva usuarios (no super_admin)
-                        (isAdmin() && resource.data.role in ['user', 'admin'] && request.resource.data.role in ['user', 'admin']) ||
-                        // Super Admin puede hacer cualquier cambio
-                        isSuperAdmin()
-                      );
-
-      allow delete: if isAuthenticated() && 
-                      (
-                        // Admin can only delete regular users
-                        (isAdmin() && resource.data.role == 'user') ||
-                        // Super Admin can delete admins too
-                        (isSuperAdmin() && resource.data.role in ['user', 'admin'])
-                      );
+      // Solo admins pueden eliminar usuarios
+      allow delete: if isAdmin() || isSuperAdmin();
     }
   }
 }
