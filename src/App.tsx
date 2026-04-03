@@ -2,8 +2,6 @@ import React, { useState, useEffect, createContext, useContext } from 'react';
 import { 
   auth, 
   db, 
-  googleProvider, 
-  signInWithPopup,
   signOut, 
   onAuthStateChanged, 
   createUserWithEmailAndPassword,
@@ -237,6 +235,199 @@ const PendingApprovalScreen = ({ onLogout }: { onLogout: () => void }) => (
     </motion.div>
   </div>
 );
+
+
+// --- Pantalla de autenticación (Login / Registro) sin Google ---
+const AuthScreen = () => {
+  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setError('');
+    const form = e.currentTarget;
+    const email = (form.elements.namedItem('email') as HTMLInputElement).value;
+    const password = (form.elements.namedItem('password') as HTMLInputElement).value;
+    try {
+      setLoading(true);
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (err: any) {
+      setLoading(false);
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        setError('Correo o contraseña incorrectos.');
+      } else {
+        setError('Error al iniciar sesión. Intenta de nuevo.');
+      }
+    }
+  };
+
+  const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setError('');
+    const form = e.currentTarget;
+    const name = (form.elements.namedItem('name') as HTMLInputElement).value.trim();
+    const email = (form.elements.namedItem('email') as HTMLInputElement).value;
+    const password = (form.elements.namedItem('password') as HTMLInputElement).value;
+    const confirm = (form.elements.namedItem('confirm') as HTMLInputElement).value;
+
+    if (password !== confirm) { setError('Las contraseñas no coinciden.'); return; }
+    if (password.length < 6) { setError('La contraseña debe tener al menos 6 caracteres.'); return; }
+    if (!name) { setError('Por favor ingresa tu nombre.'); return; }
+
+    try {
+      setLoading(true);
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      // Crear perfil en Firestore con status 'pending'
+      await setDoc(doc(db, 'users', cred.user.uid), {
+        uid: cred.user.uid,
+        displayName: name,
+        email: email,
+        photoURL: '',
+        role: 'user',
+        status: 'pending',
+        karma: 0,
+        createdAt: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      setLoading(false);
+      if (err.code === 'auth/email-already-in-use') {
+        setError('Ya existe una cuenta con ese correo. Inicia sesión.');
+      } else {
+        setError('Error al registrarse: ' + err.message);
+      }
+    }
+  };
+
+  const inputClass = "w-full bg-slate-800/60 border border-white/10 rounded-2xl px-5 py-3.5 text-white placeholder-slate-500 outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all text-sm";
+  const labelClass = "block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2";
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 flex flex-col items-center justify-center p-5 relative overflow-hidden">
+      {/* Background blobs */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }} transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }} className="absolute top-1/4 -left-40 w-80 h-80 bg-blue-600/20 rounded-full blur-3xl" />
+        <motion.div animate={{ scale: [1, 1.3, 1], opacity: [0.2, 0.4, 0.2] }} transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut', delay: 2 }} className="absolute bottom-1/4 -right-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl" />
+        <motion.div animate={{ scale: [1, 1.1, 1], opacity: [0.1, 0.3, 0.1] }} transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut', delay: 4 }} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-cyan-600/10 rounded-full blur-3xl" />
+      </div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 30, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+        className="max-w-sm w-full relative z-10"
+      >
+        {/* Logo */}
+        <div className="text-center mb-8">
+          <div className="relative inline-block mb-5">
+            <motion.div
+              animate={{ boxShadow: ['0 0 20px rgba(14,165,233,0.4)', '0 0 50px rgba(14,165,233,0.7)', '0 0 20px rgba(14,165,233,0.4)'] }}
+              transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+              className="w-20 h-20 bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 rounded-[22px] flex items-center justify-center mx-auto"
+            >
+              <Navigation className="w-10 h-10 text-white" />
+            </motion.div>
+            <span className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-400 rounded-full border-2 border-slate-950 live-dot" />
+          </div>
+          <h1 className="text-3xl font-black text-white tracking-tight">
+            Cartagena <span className="gradient-text">Movilidad</span>
+          </h1>
+          <p className="text-slate-500 text-xs font-medium mt-1">Reportes colaborativos en tiempo real 🗺️</p>
+        </div>
+
+        {/* Tab toggle */}
+        <div className="flex gap-1 bg-white/5 p-1 rounded-2xl border border-white/10 mb-5">
+          <button
+            onClick={() => { setMode('login'); setError(''); }}
+            className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${mode === 'login' ? 'bg-gradient-to-r from-cyan-500/25 to-blue-600/25 text-cyan-300 border border-cyan-500/30' : 'text-slate-500 hover:text-slate-300'}`}
+          >
+            Iniciar Sesión
+          </button>
+          <button
+            onClick={() => { setMode('register'); setError(''); }}
+            className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${mode === 'register' ? 'bg-gradient-to-r from-cyan-500/25 to-blue-600/25 text-cyan-300 border border-cyan-500/30' : 'text-slate-500 hover:text-slate-300'}`}
+          >
+            Registrarse
+          </button>
+        </div>
+
+        {/* Glass card */}
+        <motion.div
+          key={mode}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="glass rounded-3xl p-6 shadow-2xl"
+        >
+          {error && (
+            <div className="mb-4 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm font-medium">
+              {error}
+            </div>
+          )}
+
+          {mode === 'login' ? (
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div>
+                <label className={labelClass}>Correo electrónico</label>
+                <input name="email" type="email" required className={inputClass} placeholder="tu@correo.com" autoComplete="email" />
+              </div>
+              <div>
+                <label className={labelClass}>Contraseña</label>
+                <input name="password" type="password" required className={inputClass} placeholder="••••••••" autoComplete="current-password" />
+              </div>
+              <motion.button
+                type="submit"
+                disabled={loading}
+                whileTap={{ scale: 0.97 }}
+                className="btn-primary w-full py-3.5 rounded-2xl font-bold text-white text-sm tracking-wide relative overflow-hidden shine-effect disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Ingresando...' : 'Iniciar Sesión'}
+              </motion.button>
+            </form>
+          ) : (
+            <form onSubmit={handleRegister} className="space-y-4">
+              <div>
+                <label className={labelClass}>Nombre completo</label>
+                <input name="name" type="text" required className={inputClass} placeholder="Tu nombre" autoComplete="name" />
+              </div>
+              <div>
+                <label className={labelClass}>Correo electrónico</label>
+                <input name="email" type="email" required className={inputClass} placeholder="tu@correo.com" autoComplete="email" />
+              </div>
+              <div>
+                <label className={labelClass}>Contraseña</label>
+                <input name="password" type="password" required minLength={6} className={inputClass} placeholder="Mínimo 6 caracteres" autoComplete="new-password" />
+              </div>
+              <div>
+                <label className={labelClass}>Confirmar contraseña</label>
+                <input name="confirm" type="password" required className={inputClass} placeholder="Repite tu contraseña" autoComplete="new-password" />
+              </div>
+
+              {/* Info sobre aprobación */}
+              <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                <Clock className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-300/80 leading-relaxed">
+                  Tu cuenta será revisada por el administrador antes de darte acceso al mapa.
+                </p>
+              </div>
+
+              <motion.button
+                type="submit"
+                disabled={loading}
+                whileTap={{ scale: 0.97 }}
+                className="btn-primary w-full py-3.5 rounded-2xl font-bold text-white text-sm tracking-wide relative overflow-hidden shine-effect disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Creando cuenta...' : 'Solicitar Acceso'}
+              </motion.button>
+            </form>
+          )}
+        </motion.div>
+
+        <p className="text-center text-xs text-slate-600 mt-5">Cartagena, Colombia 🇨🇴</p>
+      </motion.div>
+    </div>
+  );
+};
 
 const UserManagement = ({ currentUser, currentProfile }: { currentUser: User, currentProfile: UserProfile }) => {
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -1124,13 +1315,6 @@ export default function App() {
     }
   };
 
-  const login = async () => {
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (error) {
-      console.error("Login failed", error);
-    }
-  };
 
   const logout = async () => {
     try {
@@ -1238,118 +1422,7 @@ export default function App() {
   }
 
   if (!user) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 flex flex-col items-center justify-center p-6 relative overflow-hidden">
-        {/* Background blobs */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }} transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }} className="absolute top-1/4 -left-40 w-80 h-80 bg-blue-600/20 rounded-full blur-3xl" />
-          <motion.div animate={{ scale: [1, 1.3, 1], opacity: [0.2, 0.4, 0.2] }} transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut', delay: 2 }} className="absolute bottom-1/4 -right-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl" />
-          <motion.div animate={{ scale: [1, 1.1, 1], opacity: [0.1, 0.3, 0.1] }} transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut', delay: 4 }} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-cyan-600/10 rounded-full blur-3xl" />
-        </div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 40, scale: 0.95 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-          className="max-w-md w-full relative z-10"
-        >
-          {/* Logo */}
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15, duration: 0.6 }}
-            className="text-center mb-10"
-          >
-            <div className="relative inline-block mb-6">
-              <motion.div
-                animate={{ boxShadow: ['0 0 20px rgba(14,165,233,0.4)', '0 0 50px rgba(14,165,233,0.7)', '0 0 20px rgba(14,165,233,0.4)'] }}
-                transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-                className="w-24 h-24 bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 rounded-[28px] flex items-center justify-center mx-auto"
-              >
-                <Navigation className="w-12 h-12 text-white" />
-              </motion.div>
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-400 rounded-full border-2 border-slate-950 live-dot" />
-            </div>
-            <h1 className="text-4xl font-black text-white mb-2 tracking-tight">
-              Cartagena <span className="gradient-text">Movilidad</span>
-            </h1>
-            <p className="text-slate-400 text-sm font-medium">Reportes en tiempo real para tu ciudad 🗺️</p>
-          </motion.div>
-
-          {/* Glass Card */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.6 }}
-            className="glass rounded-3xl p-8 shadow-2xl"
-          >
-            <div className="space-y-6">
-              {/* Email Form */}
-              <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  const email = (e.target as any).email.value;
-                  const password = (e.target as any).password.value;
-                  try {
-                    setLoading(true);
-                    await signInWithEmailAndPassword(auth, email, password);
-                  } catch (error: any) {
-                    alert("Error al ingresar: " + error.message);
-                    setLoading(false);
-                  }
-                }}
-                className="space-y-4"
-              >
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Correo</label>
-                  <input
-                    name="email"
-                    type="email"
-                    required
-                    className="w-full bg-slate-800/60 border border-white/10 rounded-2xl px-5 py-3.5 text-white placeholder-slate-500 outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all"
-                    placeholder="tu@correo.com"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Contraseña</label>
-                  <input
-                    name="password"
-                    type="password"
-                    required
-                    className="w-full bg-slate-800/60 border border-white/10 rounded-2xl px-5 py-3.5 text-white placeholder-slate-500 outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all"
-                    placeholder="••••••••"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="btn-primary w-full py-4 rounded-2xl font-bold text-white text-base tracking-wide relative overflow-hidden shine-effect"
-                >
-                  Ingresar
-                </button>
-              </form>
-
-              <div className="relative flex items-center">
-                <div className="flex-grow border-t border-white/10" />
-                <span className="flex-shrink mx-4 text-xs font-bold text-slate-500 uppercase tracking-widest">O</span>
-                <div className="flex-grow border-t border-white/10" />
-              </div>
-
-              <motion.button
-                whileTap={{ scale: 0.97 }}
-                whileHover={{ scale: 1.01 }}
-                onClick={login}
-                className="w-full bg-white/10 hover:bg-white/15 border border-white/15 text-white font-bold py-4 px-6 rounded-2xl transition-all flex items-center justify-center gap-3"
-              >
-                <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
-                Continuar con Google
-              </motion.button>
-            </div>
-          </motion.div>
-
-          <p className="text-center text-xs text-slate-600 mt-6">Cartagena, Colombia 🇨🇴</p>
-        </motion.div>
-      </div>
-    );
+    return <AuthScreen />;
   }
 
   return (
