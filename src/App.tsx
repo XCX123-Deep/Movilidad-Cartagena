@@ -3,8 +3,7 @@ import {
   auth, 
   db, 
   googleProvider, 
-  signInWithRedirect,
-  getRedirectResult,
+  signInWithPopup,
   signOut, 
   onAuthStateChanged, 
   createUserWithEmailAndPassword,
@@ -846,15 +845,9 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    // Safety timeout for loading state
     const timeout = setTimeout(() => {
       setLoading(false);
     }, 8000);
-
-    // Procesar resultado del redirect de Google (si viene de signInWithRedirect)
-    getRedirectResult(auth).catch((err) => {
-      console.warn('Redirect result error (ignorable):', err?.code);
-    });
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       clearTimeout(timeout);
@@ -1133,8 +1126,7 @@ export default function App() {
 
   const login = async () => {
     try {
-      // Usar redirect en lugar de popup: evita el error Cross-Origin-Opener-Policy
-      await signInWithRedirect(auth, googleProvider);
+      await signInWithPopup(auth, googleProvider);
     } catch (error) {
       console.error("Login failed", error);
     }
