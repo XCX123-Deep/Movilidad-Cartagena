@@ -1126,108 +1126,157 @@ export default function App() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8"
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 flex flex-col items-center justify-center p-6 relative overflow-hidden">
+        {/* Background blobs */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }} transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }} className="absolute top-1/4 -left-40 w-80 h-80 bg-blue-600/20 rounded-full blur-3xl" />
+          <motion.div animate={{ scale: [1, 1.3, 1], opacity: [0.2, 0.4, 0.2] }} transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut', delay: 2 }} className="absolute bottom-1/4 -right-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl" />
+          <motion.div animate={{ scale: [1, 1.1, 1], opacity: [0.1, 0.3, 0.1] }} transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut', delay: 4 }} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-cyan-600/10 rounded-full blur-3xl" />
+        </div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 40, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+          className="max-w-md w-full relative z-10"
         >
-          <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <Navigation className="w-8 h-8 text-blue-600" />
-            </div>
-            <h1 className="text-2xl font-bold text-slate-900">Cartagena Movilidad</h1>
-            <p className="text-sm text-slate-500">Ingresa para continuar</p>
-          </div>
-
-          <div className="space-y-6">
-            {/* Email Login Form */}
-            <form 
-              onSubmit={async (e) => {
-                e.preventDefault();
-                const email = (e.target as any).email.value;
-                const password = (e.target as any).password.value;
-                try {
-                  setLoading(true);
-                  await signInWithEmailAndPassword(auth, email, password);
-                } catch (error: any) {
-                  alert("Error al ingresar: " + error.message);
-                  setLoading(false);
-                }
-              }}
-              className="space-y-4"
-            >
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Correo</label>
-                <input 
-                  name="email"
-                  type="email" 
-                  required
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                  placeholder="tu@correo.com"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Contraseña</label>
-                <input 
-                  name="password"
-                  type="password" 
-                  required
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                  placeholder="••••••••"
-                />
-              </div>
-              <button 
-                type="submit"
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-blue-100"
+          {/* Logo */}
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15, duration: 0.6 }}
+            className="text-center mb-10"
+          >
+            <div className="relative inline-block mb-6">
+              <motion.div
+                animate={{ boxShadow: ['0 0 20px rgba(14,165,233,0.4)', '0 0 50px rgba(14,165,233,0.7)', '0 0 20px rgba(14,165,233,0.4)'] }}
+                transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                className="w-24 h-24 bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 rounded-[28px] flex items-center justify-center mx-auto"
               >
-                Ingresar
-              </button>
-            </form>
-
-            <div className="relative flex items-center py-2">
-              <div className="flex-grow border-t border-slate-100"></div>
-              <span className="flex-shrink mx-4 text-xs font-bold text-slate-300 uppercase">O</span>
-              <div className="flex-grow border-t border-slate-100"></div>
+                <Navigation className="w-12 h-12 text-white" />
+              </motion.div>
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-400 rounded-full border-2 border-slate-950 live-dot" />
             </div>
+            <h1 className="text-4xl font-black text-white mb-2 tracking-tight">
+              Cartagena <span className="gradient-text">Movilidad</span>
+            </h1>
+            <p className="text-slate-400 text-sm font-medium">Reportes en tiempo real para tu ciudad 🗺️</p>
+          </motion.div>
 
-            <button 
-              onClick={login}
-              className="w-full bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-3 px-6 rounded-xl transition-all flex items-center justify-center gap-3"
-            >
-              <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
-              Ingresar con Google
-            </button>
-          </div>
+          {/* Glass Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.6 }}
+            className="glass rounded-3xl p-8 shadow-2xl"
+          >
+            <div className="space-y-6">
+              {/* Email Form */}
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const email = (e.target as any).email.value;
+                  const password = (e.target as any).password.value;
+                  try {
+                    setLoading(true);
+                    await signInWithEmailAndPassword(auth, email, password);
+                  } catch (error: any) {
+                    alert("Error al ingresar: " + error.message);
+                    setLoading(false);
+                  }
+                }}
+                className="space-y-4"
+              >
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Correo</label>
+                  <input
+                    name="email"
+                    type="email"
+                    required
+                    className="w-full bg-slate-800/60 border border-white/10 rounded-2xl px-5 py-3.5 text-white placeholder-slate-500 outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all"
+                    placeholder="tu@correo.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Contraseña</label>
+                  <input
+                    name="password"
+                    type="password"
+                    required
+                    className="w-full bg-slate-800/60 border border-white/10 rounded-2xl px-5 py-3.5 text-white placeholder-slate-500 outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all"
+                    placeholder="••••••••"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="btn-primary w-full py-4 rounded-2xl font-bold text-white text-base tracking-wide relative overflow-hidden shine-effect"
+                >
+                  Ingresar
+                </button>
+              </form>
+
+              <div className="relative flex items-center">
+                <div className="flex-grow border-t border-white/10" />
+                <span className="flex-shrink mx-4 text-xs font-bold text-slate-500 uppercase tracking-widest">O</span>
+                <div className="flex-grow border-t border-white/10" />
+              </div>
+
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                whileHover={{ scale: 1.01 }}
+                onClick={login}
+                className="w-full bg-white/10 hover:bg-white/15 border border-white/15 text-white font-bold py-4 px-6 rounded-2xl transition-all flex items-center justify-center gap-3"
+              >
+                <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
+                Continuar con Google
+              </motion.button>
+            </div>
+          </motion.div>
+
+          <p className="text-center text-xs text-slate-600 mt-6">Cartagena, Colombia 🇨🇴</p>
         </motion.div>
       </div>
     );
   }
 
   return (
-    <div className="h-full bg-slate-50 flex flex-col">
+    <div className="h-full bg-slate-950 flex flex-col">
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-50">
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2">
-            <Navigation className="w-6 h-6 text-blue-600" />
-            <h1 className="text-xl font-bold text-slate-900">Cartagena Movilidad</h1>
+      <header className="glass border-b border-white/8 px-5 py-3.5 flex items-center justify-between sticky top-0 z-50 shrink-0">
+        <div className="flex items-center gap-5">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-xl flex items-center justify-center shrink-0 glow-cyan">
+              <Navigation className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-base font-black text-white tracking-tight leading-none">
+                Cartagena <span className="gradient-text">Movilidad</span>
+              </h1>
+              <div className="flex items-center gap-1 mt-0.5">
+                <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full live-dot" />
+                <span className="text-[10px] text-slate-500 font-medium">{reports.length} activos</span>
+              </div>
+            </div>
           </div>
-          
+
           {(profile?.role === 'admin' || profile?.role === 'super_admin') && (
-            <nav className="hidden md:flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
-              <button 
+            <nav className="hidden md:flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/10">
+              <button
                 onClick={() => setActiveTab('map')}
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-                  activeTab === 'map' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${
+                  activeTab === 'map'
+                    ? 'bg-gradient-to-r from-cyan-500/20 to-blue-600/20 text-cyan-400 border border-cyan-500/30'
+                    : 'text-slate-500 hover:text-slate-300'
                 }`}
               >
                 Mapa
               </button>
-              <button 
+              <button
                 onClick={() => setActiveTab('users')}
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-                  activeTab === 'users' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${
+                  activeTab === 'users'
+                    ? 'bg-gradient-to-r from-cyan-500/20 to-blue-600/20 text-cyan-400 border border-cyan-500/30'
+                    : 'text-slate-500 hover:text-slate-300'
                 }`}
               >
                 Usuarios
@@ -1235,8 +1284,9 @@ export default function App() {
             </nav>
           )}
         </div>
-        <div className="flex items-center gap-4">
-          <button 
+
+        <div className="flex items-center gap-3">
+          <button
             onClick={() => {
               if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
@@ -1245,24 +1295,30 @@ export default function App() {
                 );
               }
             }}
-            className="p-2 hover:bg-slate-100 rounded-full transition-colors text-blue-600"
+            className="p-2 hover:bg-white/10 rounded-full transition-colors text-cyan-400"
             title="Mi ubicación"
           >
             <Navigation className="w-5 h-5" />
           </button>
+
           <div className="hidden sm:flex flex-col items-end">
             <div className="flex items-center gap-1">
-              <span className="text-sm font-bold text-slate-900">{profile?.displayName}</span>
-              {profile?.role === 'super_admin' && <ShieldCheck className="w-3 h-3 text-purple-500" />}
-              {profile?.role === 'admin' && <ShieldCheck className="w-3 h-3 text-blue-500" />}
+              <span className="text-sm font-bold text-white">{profile?.displayName}</span>
+              {profile?.role === 'super_admin' && <ShieldCheck className="w-3 h-3 text-purple-400" />}
+              {profile?.role === 'admin' && <ShieldCheck className="w-3 h-3 text-cyan-400" />}
             </div>
-            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-              {profile?.role === 'super_admin' ? 'Super Admin' : profile?.role === 'admin' ? 'Administrador' : 'Usuario'}
+            <span className="text-[10px] uppercase font-bold tracking-wider" style={{
+              background: 'linear-gradient(135deg, #38bdf8, #818cf8)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent'
+            }}>
+              {profile?.role === 'super_admin' ? 'Super Admin' : profile?.role === 'admin' ? 'Admin' : 'Usuario'}
             </span>
           </div>
-          <button 
+
+          <button
             onClick={logout}
-            className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-600"
+            className="p-2 hover:bg-red-500/10 hover:text-red-400 rounded-full transition-colors text-slate-500"
             title="Cerrar sesión"
           >
             <LogOut className="w-5 h-5" />
@@ -1272,120 +1328,128 @@ export default function App() {
 
       <main className="flex-1 flex flex-col lg:flex-row overflow-hidden relative min-h-0">
         {activeTab === 'users' && profile && (profile.role === 'admin' || profile.role === 'super_admin') ? (
-          <div className="flex-1 overflow-y-auto bg-slate-50">
+          <div className="flex-1 overflow-y-auto bg-slate-950">
             <UserManagement currentUser={user} currentProfile={profile} />
           </div>
         ) : (
           <>
             {/* Sidebar / List */}
-            <div className="w-full lg:w-96 bg-white border-r border-slate-200 flex flex-col h-[40vh] lg:h-auto">
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 className="font-bold text-slate-800 flex items-center gap-2">
-              <Info className="w-4 h-4 text-blue-500" />
-              Reportes Activos ({reports.length})
-            </h2>
-            <button 
-              onClick={() => setShowAddModal(true)}
-              className="lg:hidden bg-blue-600 text-white p-2 rounded-full shadow-md"
-            >
-              <Plus className="w-5 h-5" />
-            </button>
-          </div>
-          <div 
-            className="flex-1 overflow-y-auto p-4 space-y-4 relative"
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-          >
-            {/* Custom Pull-to-Refresh Indicator */}
-            <AnimatePresence>
-              {(pullDistance > 0 || isRefreshing) && (
-                <motion.div 
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ 
-                    height: isRefreshing ? 60 : Math.min(pullDistance, 100),
-                    opacity: 1 
-                  }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="flex items-center justify-center overflow-hidden"
+            <div className="w-full lg:w-96 glass border-r border-white/8 flex flex-col h-[38vh] lg:h-auto shrink-0">
+              <div className="px-5 py-4 border-b border-white/8 flex items-center justify-between">
+                <h2 className="font-black text-white flex items-center gap-2 text-base">
+                  <span className="w-2 h-2 bg-emerald-400 rounded-full live-dot" />
+                  Reportes Activos
+                  <span className="ml-1 text-xs font-bold text-slate-500 bg-white/5 px-2 py-0.5 rounded-full border border-white/10">{reports.length}</span>
+                </h2>
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  className="lg:hidden btn-primary text-white p-2.5 rounded-xl shadow-lg"
                 >
-                  <motion.div
-                    animate={{ rotate: isRefreshing ? 360 : pullDistance * 2 }}
-                    transition={isRefreshing ? { repeat: Infinity, duration: 1, ease: "linear" } : {}}
-                  >
-                    <Navigation className="w-6 h-6 text-blue-600" />
-                  </motion.div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {loading ? (
-              <>
-                <ReportSkeleton />
-                <ReportSkeleton />
-                <ReportSkeleton />
-              </>
-            ) : reports.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <CheckCircle2 className="w-8 h-8 text-slate-300" />
-                </div>
-                <p className="text-slate-500">No hay reportes activos en este momento.</p>
+                  <Plus className="w-5 h-5" />
+                </button>
               </div>
-            ) : (
-              reports.map((report) => (
-                <motion.div 
-                  key={report.id}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="p-4 rounded-2xl border border-slate-100 bg-slate-50 hover:bg-white hover:shadow-md transition-all cursor-pointer group"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 bg-white rounded-xl shadow-sm">
-                      <ReportTypeIcon type={report.type} className="w-5 h-5" />
+
+              <div
+                className="flex-1 overflow-y-auto p-4 space-y-3 relative"
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+              >
+                {/* Pull-to-Refresh */}
+                <AnimatePresence>
+                  {(pullDistance > 0 || isRefreshing) && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: isRefreshing ? 50 : Math.min(pullDistance, 80), opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="flex items-center justify-center overflow-hidden"
+                    >
+                      <motion.div
+                        animate={{ rotate: isRefreshing ? 360 : pullDistance * 2 }}
+                        transition={isRefreshing ? { repeat: Infinity, duration: 0.8, ease: 'linear' } : {}}
+                      >
+                        <Navigation className="w-5 h-5 text-cyan-400" />
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {loading ? (
+                  <>
+                    <ReportSkeleton />
+                    <ReportSkeleton />
+                    <ReportSkeleton />
+                  </>
+                ) : reports.length === 0 ? (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="text-center py-16"
+                  >
+                    <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-white/10">
+                      <CheckCircle2 className="w-8 h-8 text-slate-600" />
                     </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-bold text-slate-900 text-sm">{ReportTypeName(report.type)}</h3>
-                        <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">
-                          {report.timestamp?.toDate ? formatDistanceToNow(report.timestamp.toDate(), { addSuffix: true, locale: es }) : 'Recién'}
-                        </span>
+                    <p className="text-slate-500 font-medium">Todo tranquilo por aquí 🛣️</p>
+                    <p className="text-slate-600 text-sm mt-1">No hay reportes activos.</p>
+                  </motion.div>
+                ) : (
+                  reports.map((report, i) => (
+                    <motion.div
+                      key={report.id}
+                      initial={{ opacity: 0, x: -16, scale: 0.97 }}
+                      animate={{ opacity: 1, x: 0, scale: 1 }}
+                      transition={{ delay: i * 0.04, type: 'spring', stiffness: 300, damping: 25 }}
+                      onClick={() => setSelectedReport(report)}
+                      className="glass-card p-4 rounded-2xl hover:bg-white/10 transition-all cursor-pointer group border border-white/8 hover:border-white/15"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`p-2.5 rounded-xl shrink-0 ${
+                          report.type === 'transit_checkpoint' ? 'bg-amber-500/15 text-amber-400'
+                          : report.type === 'police_presence' ? 'bg-blue-500/15 text-blue-400'
+                          : 'bg-red-500/15 text-red-400'
+                        }`}>
+                          <ReportTypeIcon type={report.type} className="w-5 h-5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-0.5">
+                            <h3 className="font-bold text-white text-sm">{ReportTypeName(report.type)}</h3>
+                            <span className="text-[10px] text-slate-500 font-medium shrink-0 ml-2">
+                              {report.timestamp?.toDate ? formatDistanceToNow(report.timestamp.toDate(), { addSuffix: true, locale: es }) : 'Recién'}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-400 line-clamp-1 mb-1.5">
+                            {report.description || 'Sin descripción.'}
+                          </p>
+                          <div className="flex items-center gap-1 text-[10px] text-slate-600">
+                            <MapPin className="w-3 h-3" />
+                            <span>{report.location?.latitude?.toFixed(4) ?? '?'}, {report.location?.longitude?.toFixed(4) ?? '?'}</span>
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-2 shrink-0">
+                          <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-cyan-400 transition-colors" />
+                          {(report.reporterUid === user.uid || profile?.role === 'admin') && (
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                try {
+                                  await updateDoc(doc(db, 'reports', report.id), { status: 'resolved' });
+                                } catch (error) {
+                                  console.error('Failed to resolve report', error);
+                                }
+                              }}
+                              className="p-1 hover:bg-emerald-500/20 text-emerald-500 rounded-lg transition-colors"
+                              title="Marcar como resuelto"
+                            >
+                              <CheckCircle2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <p className="text-xs text-slate-600 line-clamp-2 mb-2">
-                        {report.description || 'Sin descripción adicional.'}
-                      </p>
-                      <div className="flex items-center gap-1 text-[10px] text-slate-400">
-                        <MapPin className="w-3 h-3" />
-                        <span>
-                          {report.location?.latitude?.toFixed(4) ?? '?'}, {report.location?.longitude?.toFixed(4) ?? '?'}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-blue-500 transition-colors" />
-                      {(report.reporterUid === user.uid || profile?.role === 'admin') && (
-                        <button 
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            try {
-                              await updateDoc(doc(db, 'reports', report.id), { status: 'resolved' });
-                            } catch (error) {
-                              console.error("Failed to resolve report", error);
-                            }
-                          }}
-                          className="p-1 hover:bg-green-100 text-green-600 rounded-lg transition-colors"
-                          title="Marcar como resuelto"
-                        >
-                          <CheckCircle2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </motion.div>
-              ))
-            )}
-          </div>
-        </div>
+                    </motion.div>
+                  ))
+                )}
+              </div>
+            </div>
 
         {/* Map Area - min-h-0 es clave para que flex-1 dé altura computada en móvil */}
         <div 
@@ -1717,22 +1781,30 @@ export default function App() {
             )}
           </AnimatePresence>
 
-          {/* Floating Action Button */}
-          <div className="absolute bottom-8 right-8 z-40 flex flex-col gap-4 items-end">
-            <button 
+          {/* Floating Action Buttons */}
+          <div className="absolute bottom-8 right-5 z-40 flex flex-col gap-3 items-end">
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.92 }}
               onClick={startVoiceReporting}
-              className={`w-14 h-14 rounded-full shadow-2xl flex items-center justify-center transition-all hover:scale-110 active:scale-95 ${
-                isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-white text-slate-600'
+              className={`w-13 h-13 rounded-full shadow-2xl flex items-center justify-center transition-all ${
+                isListening
+                  ? 'bg-red-500 text-white glow-blue animate-pulse'
+                  : 'glass-card text-slate-300 hover:text-white border border-white/15'
               }`}
+              style={{ width: 52, height: 52 }}
             >
-              <Mic className="w-6 h-6" />
-            </button>
-            <button 
+              <Mic className="w-5 h-5" />
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.08 }}
+              whileTap={{ scale: 0.93 }}
               onClick={() => setShowAddModal(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white w-16 h-16 rounded-full shadow-2xl flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+              className="btn-primary text-white rounded-full shadow-2xl flex items-center justify-center relative overflow-hidden shine-effect"
+              style={{ width: 64, height: 64 }}
             >
               <Plus className="w-8 h-8" />
-            </button>
+            </motion.button>
           </div>
         </div>
           </>
@@ -1742,87 +1814,87 @@ export default function App() {
       {/* Add Report Bottom Sheet */}
       <AnimatePresence>
         {showAddModal && (
-          <div className="fixed inset-0 z-[100] flex items-end justify-center">
-            <motion.div 
+          <div className="fixed inset-0 z-[200] flex items-end justify-center">
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setShowAddModal(false)}
-              className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px]"
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             />
-            <motion.div 
+            <motion.div
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="relative w-full max-w-2xl bg-white rounded-t-[40px] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+              transition={{ type: 'spring', damping: 28, stiffness: 220 }}
+              className="relative w-full max-w-2xl rounded-t-[36px] shadow-2xl overflow-hidden max-h-[92vh] flex flex-col"
+              style={{ background: 'rgba(15,23,42,0.97)', backdropFilter: 'blur(40px)', border: '1px solid rgba(255,255,255,0.08)' }}
             >
-              <div className="p-6 border-b border-slate-50 flex items-center justify-between shrink-0">
-                <div className="w-12" /> {/* Spacer */}
-                <div className="w-12 h-1.5 bg-slate-200 rounded-full" />
-                <button onClick={() => setShowAddModal(false)} className="p-2 hover:bg-slate-100 rounded-full">
-                  <X className="w-6 h-6 text-slate-400" />
+              {/* Handle */}
+              <div className="pt-5 pb-3 px-6 flex items-center justify-between shrink-0">
+                <div className="w-10" />
+                <div className="w-12 h-1 bg-white/20 rounded-full" />
+                <button onClick={() => setShowAddModal(false)} className="p-1.5 hover:bg-white/10 rounded-full transition-colors">
+                  <X className="w-5 h-5 text-slate-400" />
                 </button>
               </div>
-              
-              <div className="p-8 space-y-8 overflow-y-auto flex-1 pb-12">
+
+              <div className="p-6 space-y-7 overflow-y-auto flex-1 pb-10">
                 <div className="text-center">
-                  <h2 className="text-2xl font-black text-slate-900 mb-2">Nuevo Reporte</h2>
-                  <p className="text-slate-500">Ayuda a otros conductores informando lo que ves.</p>
+                  <h2 className="text-2xl font-black text-white mb-1">Nuevo Reporte</h2>
+                  <p className="text-slate-400 text-sm">Ayuda a otros conductores informando lo que ves.</p>
                 </div>
 
                 {/* Type Selection */}
                 <div>
-                  <label className="block text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">¿Qué está pasando?</label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">¿Qué está pasando?</label>
+                  <div className="grid grid-cols-3 gap-3">
                     {(['transit_checkpoint', 'police_presence', 'traffic_flow'] as ReportType[]).map((type) => (
-                      <button
+                      <motion.button
                         key={type}
-                        onClick={() => {
-                          haptic('short');
-                          setNewReport({ ...newReport, type });
-                        }}
-                        className={`p-6 rounded-[32px] border-2 transition-all text-center flex flex-col items-center gap-3 ${
-                          newReport.type === type 
-                            ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-xl shadow-blue-100 scale-105' 
-                            : 'border-slate-100 hover:border-slate-200 text-slate-600'
+                        whileTap={{ scale: 0.95 }}
+                        whileHover={{ scale: 1.02 }}
+                        onClick={() => { haptic('short'); setNewReport({ ...newReport, type }); }}
+                        className={`p-5 rounded-3xl border-2 transition-all text-center flex flex-col items-center gap-3 ${
+                          newReport.type === type
+                            ? 'border-cyan-500/50 bg-cyan-500/10 shadow-lg shadow-cyan-500/10'
+                            : 'border-white/8 bg-white/5 hover:border-white/20 hover:bg-white/8'
                         }`}
                       >
-                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
-                          newReport.type === type ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400'
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${
+                          newReport.type === type
+                            ? 'bg-gradient-to-br from-cyan-400 to-blue-600 text-white shadow-lg shadow-cyan-500/30'
+                            : 'bg-white/10 text-slate-400'
                         }`}>
-                          <ReportTypeIcon type={type} className="w-7 h-7" />
+                          <ReportTypeIcon type={type} className="w-6 h-6" />
                         </div>
-                        <span className="text-sm font-black leading-tight">{ReportTypeName(type)}</span>
-                      </button>
+                        <span className={`text-xs font-black leading-tight ${
+                          newReport.type === type ? 'text-cyan-400' : 'text-slate-400'
+                        }`}>{ReportTypeName(type)}</span>
+                      </motion.button>
                     ))}
                   </div>
                 </div>
 
                 {/* Description */}
                 <div>
-                  <label className="block text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Detalles adicionales</label>
-                  <textarea 
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Detalles adicionales</label>
+                  <textarea
                     value={newReport.description}
                     onChange={(e) => setNewReport({ ...newReport, description: e.target.value })}
                     placeholder="Ej: Retén en la Av. Pedro de Heredia, sentido centro..."
-                    className="w-full bg-slate-50 border-2 border-slate-100 rounded-[32px] p-6 text-slate-900 focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all h-32 resize-none text-lg"
+                    className="w-full bg-white/5 border border-white/10 rounded-3xl p-5 text-white placeholder-slate-600 focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500/30 outline-none transition-all h-28 resize-none text-sm"
                   />
                 </div>
 
                 {/* Location Picker */}
                 <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <label className="block text-sm font-bold text-slate-400 uppercase tracking-widest">
-                      Ubicación
-                    </label>
-                    <button 
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest">Ubicación</label>
+                    <button
                       onClick={() => {
                         haptic('short');
-                        if (!navigator.geolocation) {
-                          alert('Tu dispositivo no soporta geolocalización.');
-                          return;
-                        }
+                        if (!navigator.geolocation) { alert('Tu dispositivo no soporta geolocalización.'); return; }
                         navigator.geolocation.getCurrentPosition(
                           (pos) => {
                             const lat = pos.coords.latitude;
@@ -1832,18 +1904,18 @@ export default function App() {
                           },
                           (err) => {
                             console.error('Geolocation error:', err);
-                            alert('No se pudo obtener tu ubicación. Asegúrate de haber dado permiso de ubicación al navegador y que HTTPS esté activo.');
+                            alert('No se pudo obtener tu ubicación. Habilita permisos de ubicación y que HTTPS esté activo.');
                           },
                           { enableHighAccuracy: true, timeout: 10000 }
                         );
                       }}
-                      className="text-sm text-blue-600 font-black hover:underline flex items-center gap-1"
+                      className="text-xs text-cyan-400 font-bold hover:text-cyan-300 flex items-center gap-1.5 transition-colors"
                     >
-                      <Navigation className="w-4 h-4" />
+                      <Navigation className="w-3.5 h-3.5" />
                       Usar mi ubicación
                     </button>
                   </div>
-                  <div className="h-72 rounded-[40px] overflow-hidden border-4 border-slate-50 shadow-inner relative group">
+                  <div className="h-64 rounded-3xl overflow-hidden border border-white/10 shadow-inner relative">
                     <MapContainer center={userLocation} zoom={15} className="w-full h-full">
                       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                       <RecenterMap center={userLocation} />
@@ -1852,13 +1924,12 @@ export default function App() {
                         haptic('short');
                         setNewReport({ ...newReport, latitude: lat, longitude: lng });
                       }} />
-                      {/* Mostrar punto azul de ubicacion actual del usuario en el mini-mapa */}
                       <UserLocationMarker position={userLocation} />
                     </MapContainer>
                     {!newReport.latitude && (
-                      <div className="absolute inset-0 bg-slate-900/20 backdrop-blur-[1px] pointer-events-none flex items-center justify-center">
-                        <div className="bg-white px-6 py-3 rounded-full shadow-2xl font-black text-slate-900 flex items-center gap-2">
-                          <MapPin className="w-5 h-5 text-blue-600" />
+                      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] pointer-events-none flex items-center justify-center">
+                        <div className="glass px-5 py-2.5 rounded-full shadow-2xl font-bold text-white text-sm flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-cyan-400" />
                           Toca el mapa para marcar
                         </div>
                       </div>
@@ -1866,29 +1937,26 @@ export default function App() {
                   </div>
                 </div>
 
-                  <button 
-                    onClick={() => {
-                      haptic('short');
-                      if (!newReport.latitude || !newReport.longitude) return;
-                      // Construir el objeto location correcto antes de enviar
-                      handleSubmitReport({
-                        type: newReport.type,
-                        description: newReport.description,
-                        location: {
-                          latitude: newReport.latitude,
-                          longitude: newReport.longitude
-                        }
-                      });
-                    }}
-                    disabled={!newReport.latitude}
-                    className={`w-full py-6 rounded-[32px] font-black text-xl transition-all shadow-2xl ${
-                      newReport.latitude 
-                        ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200 hover:-translate-y-1 active:translate-y-0' 
-                        : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                    }`}
-                  >
-                    Publicar Reporte
-                  </button>
+                <motion.button
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => {
+                    haptic('short');
+                    if (!newReport.latitude || !newReport.longitude) return;
+                    handleSubmitReport({
+                      type: newReport.type,
+                      description: newReport.description,
+                      location: { latitude: newReport.latitude, longitude: newReport.longitude }
+                    });
+                  }}
+                  disabled={!newReport.latitude}
+                  className={`w-full py-5 rounded-3xl font-black text-lg transition-all relative overflow-hidden ${
+                    newReport.latitude
+                      ? 'btn-primary text-white shine-effect'
+                      : 'bg-white/5 text-slate-600 cursor-not-allowed border border-white/8'
+                  }`}
+                >
+                  Publicar Reporte
+                </motion.button>
               </div>
             </motion.div>
           </div>
