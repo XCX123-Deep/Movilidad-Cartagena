@@ -2,6 +2,8 @@ import React, { useState, useEffect, createContext, useContext } from 'react';
 import { 
   auth, 
   db, 
+  googleProvider,
+  signInWithPopup,
   signOut, 
   onAuthStateChanged, 
   createUserWithEmailAndPassword,
@@ -382,6 +384,33 @@ const AuthScreen = () => {
                 className="btn-primary w-full py-3.5 rounded-2xl font-bold text-white text-sm tracking-wide relative overflow-hidden shine-effect disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {loading ? 'Ingresando...' : 'Iniciar Sesión'}
+              </motion.button>
+
+              <div className="relative flex items-center my-1">
+                <div className="flex-grow border-t border-white/10" />
+                <span className="flex-shrink mx-4 text-xs font-bold text-slate-600 uppercase tracking-widest">o</span>
+                <div className="flex-grow border-t border-white/10" />
+              </div>
+
+              <motion.button
+                type="button"
+                disabled={loading}
+                whileTap={{ scale: 0.97 }}
+                onClick={async () => {
+                  try {
+                    setLoading(true);
+                    await signInWithPopup(auth, googleProvider);
+                  } catch (err: any) {
+                    setLoading(false);
+                    if (err.code !== 'auth/popup-closed-by-user') {
+                      setError('Error al iniciar sesión con Google.');
+                    }
+                  }
+                }}
+                className="w-full bg-white/8 hover:bg-white/12 border border-white/15 text-white font-bold py-3.5 px-6 rounded-2xl transition-all flex items-center justify-center gap-3 text-sm disabled:opacity-60"
+              >
+                <img src="https://www.google.com/favicon.ico" className="w-4 h-4" alt="Google" />
+                Continuar con Google
               </motion.button>
             </form>
           ) : (
