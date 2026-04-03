@@ -475,9 +475,19 @@ const UserManagement = ({ currentUser, currentProfile }: { currentUser: User, cu
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
-    const q = query(collection(db, 'users'), orderBy('email'));
+    // Sin orderBy para evitar requerir índice compuesto
+    const q = query(collection(db, 'users'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setUsers(snapshot.docs.map(doc => doc.data() as UserProfile));
+      const all = snapshot.docs.map(doc => doc.data() as UserProfile);
+      // Ordenar en el cliente: primero pendientes, luego por email
+      all.sort((a, b) => {
+        if (a.status === 'pending' && b.status !== 'pending') return -1;
+        if (a.status !== 'pending' && b.status === 'pending') return 1;
+        return (a.email || '').localeCompare(b.email || '');
+      });
+      setUsers(all);
+    }, (error) => {
+      console.error('Error loading users:', error);
     });
     return () => unsubscribe();
   }, []);
