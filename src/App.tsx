@@ -593,10 +593,15 @@ const UserManagement = ({ currentUser, currentProfile }: { currentUser: User, cu
     }
   };
 
-  const pendingUsers = users.filter(u => u.status === 'pending');
-  const activeUsers = users.filter(u => u.status !== 'pending').filter(u =>
-    u.displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.email.toLowerCase().includes(searchTerm.toLowerCase())
+  // Incluir usuarios cuyo status sea 'pending' O que no tengan status definido (registro incompleto)
+  const pendingUsers = users.filter(u =>
+    u.status === 'pending' || (!u.status && u.role !== 'super_admin' && u.role !== 'admin')
+  );
+  const activeUsers = users.filter(u =>
+    u.status === 'active' || u.status === 'disabled' || u.role === 'admin' || u.role === 'super_admin'
+  ).filter(u =>
+    (u.displayName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (u.email || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -613,7 +618,7 @@ const UserManagement = ({ currentUser, currentProfile }: { currentUser: User, cu
             </button>
             <div>
               <h2 className="text-xl font-black text-white">Gestión de Usuarios</h2>
-              <p className="text-xs text-slate-500">Administra roles y accesos</p>
+              <p className="text-xs text-slate-500">Administra roles y accesos · {users.length} usuarios cargados · {pendingUsers.length} pend.</p>
             </div>
           </div>
           <button
