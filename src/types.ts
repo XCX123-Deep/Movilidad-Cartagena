@@ -26,7 +26,8 @@ export interface UserProfile {
   email: string;
   photoURL?: string;
   role: 'user' | 'admin' | 'super_admin';
-  status: 'active' | 'disabled';
+  status: 'active' | 'disabled' | 'pending';
   sessionId?: string;
   karma: number;
+  createdAt?: any;
 }

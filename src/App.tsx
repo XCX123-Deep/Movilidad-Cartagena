@@ -178,10 +178,71 @@ const LocationPicker = ({ onLocationSelect }: { onLocationSelect: (lat: number, 
   );
 };
 
+// --- Pantalla de espera para usuarios pendientes ---
+const PendingApprovalScreen = ({ onLogout }: { onLogout: () => void }) => (
+  <div className="min-h-screen flex flex-col items-center justify-center p-6" style={{ background: 'radial-gradient(ellipse at 50% 0%, rgba(6,182,212,0.12) 0%, #0f172a 60%)' }}>
+    {/* Blobs */}
+    <div className="fixed top-1/4 left-1/4 w-64 h-64 rounded-full opacity-10 blur-3xl" style={{ background: 'radial-gradient(circle, #06b6d4, transparent)' }} />
+    <div className="fixed bottom-1/4 right-1/4 w-64 h-64 rounded-full opacity-10 blur-3xl" style={{ background: 'radial-gradient(circle, #6366f1, transparent)' }} />
+
+    <motion.div
+      initial={{ opacity: 0, y: 24 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="relative z-10 w-full max-w-sm text-center"
+    >
+      {/* Icon */}
+      <motion.div
+        animate={{ scale: [1, 1.06, 1] }}
+        transition={{ repeat: Infinity, duration: 2.5, ease: 'easeInOut' }}
+        className="w-24 h-24 mx-auto mb-8 rounded-3xl flex items-center justify-center"
+        style={{ background: 'linear-gradient(135deg, rgba(251,191,36,0.2), rgba(245,158,11,0.1))', border: '1px solid rgba(251,191,36,0.3)' }}
+      >
+        <Clock className="w-12 h-12 text-amber-400" />
+      </motion.div>
+
+      <h1 className="text-3xl font-black text-white mb-3">Solicitud Enviada</h1>
+      <p className="text-slate-400 mb-8 leading-relaxed">
+        Tu cuenta está <span className="text-amber-400 font-semibold">pendiente de aprobación</span>.<br />
+        El administrador revisará tu solicitud pronto y te dará acceso.
+      </p>
+
+      <div className="glass-card rounded-2xl p-5 mb-8 text-left space-y-3" style={{ border: '1px solid rgba(251,191,36,0.15)' }}>
+        <div className="flex items-center gap-3 text-sm">
+          <div className="w-7 h-7 rounded-full bg-amber-500/15 flex items-center justify-center">
+            <span className="text-amber-400 text-xs font-bold">1</span>
+          </div>
+          <span className="text-slate-300">Tu solicitud fue registrada correctamente</span>
+        </div>
+        <div className="flex items-center gap-3 text-sm">
+          <div className="w-7 h-7 rounded-full bg-amber-500/15 flex items-center justify-center">
+            <span className="text-amber-400 text-xs font-bold">2</span>
+          </div>
+          <span className="text-slate-400">El admin revisará y aprobará tu cuenta</span>
+        </div>
+        <div className="flex items-center gap-3 text-sm">
+          <div className="w-7 h-7 rounded-full bg-slate-700 flex items-center justify-center">
+            <span className="text-slate-500 text-xs font-bold">3</span>
+          </div>
+          <span className="text-slate-500">Vuelve a iniciar sesión para acceder al mapa</span>
+        </div>
+      </div>
+
+      <button
+        onClick={onLogout}
+        className="w-full py-3 rounded-2xl font-bold text-slate-400 hover:text-white transition-colors"
+        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
+      >
+        Cerrar Sesión
+      </button>
+    </motion.div>
+  </div>
+);
+
 const UserManagement = ({ currentUser, currentProfile }: { currentUser: User, currentProfile: UserProfile }) => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [activeUserTab, setActiveUserTab] = useState<'active' | 'pending'>('pending');
   const [newUser, setNewUser] = useState({
     email: '',
     password: '',
@@ -203,17 +264,14 @@ const UserManagement = ({ currentUser, currentProfile }: { currentUser: User, cu
     setCreating(true);
     let secondaryApp: ReturnType<typeof initializeApp> | null = null;
     try {
-      // Reusar o crear la app secundaria para no cerrar sesión del admin actual
       try {
         secondaryApp = getApp('Secondary');
       } catch {
         secondaryApp = initializeApp(firebaseConfig, 'Secondary');
       }
       const secondaryAuth = getAuth(secondaryApp);
-      
       const userCredential = await createUserWithEmailAndPassword(secondaryAuth, newUser.email, newUser.password);
       const createdUser = userCredential.user;
-
       const newProfile: UserProfile = {
         uid: createdUser.uid,
         displayName: newUser.displayName || 'Usuario',
@@ -223,10 +281,8 @@ const UserManagement = ({ currentUser, currentProfile }: { currentUser: User, cu
         sessionId: '',
         karma: 0
       };
-
       await setDoc(doc(db, 'users', createdUser.uid), newProfile);
       await secondaryAuth.signOut();
-      
       setShowCreateModal(false);
       setNewUser({ email: '', password: '', displayName: '', role: 'user' });
       alert("Usuario creado exitosamente.");
@@ -234,7 +290,6 @@ const UserManagement = ({ currentUser, currentProfile }: { currentUser: User, cu
       console.error("Error creating user", error);
       alert("Error al crear usuario: " + error.message);
     } finally {
-      // Limpiar siempre la app secundaria para evitar memory leak
       if (secondaryApp) {
         try { await deleteApp(secondaryApp); } catch {}
       }
@@ -242,232 +297,286 @@ const UserManagement = ({ currentUser, currentProfile }: { currentUser: User, cu
     }
   };
 
-  const toggleUserStatus = async (user: UserProfile) => {
-    const newStatus = user.status === 'active' ? 'disabled' : 'active';
+  const approveUser = async (u: UserProfile) => {
     try {
-      await updateDoc(doc(db, 'users', user.uid), { status: newStatus });
+      await updateDoc(doc(db, 'users', u.uid), { status: 'active' });
     } catch (error) {
-      console.error("Error toggling status", error);
-      alert("No tienes permisos para realizar esta acción.");
+      alert("No tienes permisos para aprobar usuarios.");
     }
   };
 
-  const deleteUser = async (user: UserProfile) => {
-    if (!confirm(`¿Estás seguro de eliminar a ${user.displayName}?`)) return;
+  const rejectUser = async (u: UserProfile) => {
+    if (!confirm(`¿Rechazar y eliminar la cuenta de ${u.displayName}?`)) return;
     try {
-      await deleteDoc(doc(db, 'users', user.uid));
+      await deleteDoc(doc(db, 'users', u.uid));
     } catch (error) {
-      console.error("Error deleting user", error);
       alert("No tienes permisos para eliminar a este usuario.");
     }
   };
 
-  const updateUserRole = async (user: UserProfile, newRole: 'user' | 'admin' | 'super_admin') => {
+  const toggleUserStatus = async (u: UserProfile) => {
+    const newStatus = u.status === 'active' ? 'disabled' : 'active';
     try {
-      await updateDoc(doc(db, 'users', user.uid), { role: newRole });
+      await updateDoc(doc(db, 'users', u.uid), { status: newStatus });
     } catch (error) {
-      console.error("Error updating role", error);
+      alert("No tienes permisos para realizar esta acción.");
+    }
+  };
+
+  const deleteUser = async (u: UserProfile) => {
+    if (!confirm(`¿Estás seguro de eliminar a ${u.displayName}?`)) return;
+    try {
+      await deleteDoc(doc(db, 'users', u.uid));
+    } catch (error) {
+      alert("No tienes permisos para eliminar a este usuario.");
+    }
+  };
+
+  const updateUserRole = async (u: UserProfile, newRole: 'user' | 'admin' | 'super_admin') => {
+    try {
+      await updateDoc(doc(db, 'users', u.uid), { role: newRole });
+    } catch (error) {
       alert("No tienes permisos para cambiar el rol.");
     }
   };
 
-  const filteredUsers = users.filter(u => 
-    u.displayName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+  const pendingUsers = users.filter(u => u.status === 'pending');
+  const activeUsers = users.filter(u => u.status !== 'pending').filter(u =>
+    u.displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-4">
-          <button 
-            onClick={() => window.location.reload()} 
-            className="p-2 hover:bg-slate-100 rounded-full transition-colors"
-            title="Regresar"
-          >
-            <ChevronRight className="w-6 h-6 text-slate-400 rotate-180" />
-          </button>
-          <div>
-            <h2 className="text-2xl font-bold text-slate-900">Gestión de Usuarios</h2>
-            <p className="text-slate-500">Administra roles y accesos del sistema</p>
+    <div className="min-h-screen" style={{ background: '#0f172a' }}>
+      <div className="p-4 max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6 pt-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => window.location.reload()}
+              className="p-2 hover:bg-white/10 rounded-full transition-colors"
+            >
+              <ChevronRight className="w-6 h-6 text-slate-400 rotate-180" />
+            </button>
+            <div>
+              <h2 className="text-xl font-black text-white">Gestión de Usuarios</h2>
+              <p className="text-xs text-slate-500">Administra roles y accesos</p>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="relative hidden md:block">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input 
-              type="text" 
-              placeholder="Buscar usuario..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all w-64"
-            />
-          </div>
-          <button 
+          <button
             onClick={() => setShowCreateModal(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-100 transition-all"
+            className="btn-primary px-4 py-2 rounded-xl font-bold flex items-center gap-2 text-white text-sm"
           >
             <UserPlus className="w-4 h-4" />
-            <span className="hidden sm:inline">Nuevo Usuario</span>
+            <span className="hidden sm:inline">Nuevo</span>
           </button>
         </div>
-      </div>
 
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Usuario</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Rol</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredUsers.map((u) => (
-                <tr key={u.uid} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <img src={u.photoURL || `https://ui-avatars.com/api/?name=${u.displayName}`} className="w-10 h-10 rounded-full border border-slate-200" alt="" />
-                      <div>
-                        <div className="font-bold text-slate-900">{u.displayName}</div>
-                        <div className="text-xs text-slate-500">{u.email}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <select 
-                      value={u.role}
-                      onChange={(e) => updateUserRole(u, e.target.value as any)}
-                      disabled={
-                        (currentProfile.role === 'admin' && u.role === 'super_admin') ||
-                        (currentProfile.role === 'admin' && u.role === 'admin' && u.uid !== currentUser.uid)
-                      }
-                      className="bg-slate-100 border-none rounded-lg px-3 py-1 text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="user">Usuario</option>
-                      <option value="admin">Admin</option>
-                      {currentProfile.role === 'super_admin' && <option value="super_admin">Super Admin</option>}
-                    </select>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                      u.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                    }`}>
-                      {u.status === 'active' ? 'Activo' : 'Deshabilitado'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <button 
-                        onClick={() => toggleUserStatus(u)}
-                        disabled={
-                          (currentProfile.role === 'admin' && u.role !== 'user') ||
-                          u.uid === currentUser.uid
-                        }
-                        className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                          u.status === 'active' 
-                            ? 'bg-red-50 text-red-600 hover:bg-red-100' 
-                            : 'bg-green-50 text-green-600 hover:bg-green-100'
-                        } disabled:opacity-30`}
-                      >
-                        {u.status === 'active' ? (
-                          <><Ban className="w-3 h-3" /> Deshabilitar</>
-                        ) : (
-                          <><CheckCircle className="w-3 h-3" /> Habilitar</>
-                        )}
-                      </button>
-                      <button 
-                        onClick={() => deleteUser(u)}
-                        disabled={
-                          (currentProfile.role === 'admin' && u.role !== 'user') ||
-                          u.uid === currentUser.uid
-                        }
-                        className="flex items-center gap-1 px-3 py-1.5 bg-slate-50 text-slate-600 hover:bg-red-50 hover:text-red-600 rounded-lg text-xs font-bold transition-all disabled:opacity-30"
-                      >
-                        <Trash2 className="w-3 h-3" /> Eliminar
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {/* Tabs */}
+        <div className="flex gap-2 mb-5">
+          <button
+            onClick={() => setActiveUserTab('pending')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+              activeUserTab === 'pending'
+                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                : 'text-slate-500 hover:text-slate-300'
+            }`}
+          >
+            <Clock className="w-4 h-4" />
+            Pendientes
+            {pendingUsers.length > 0 && (
+              <span className="bg-amber-500 text-black text-[10px] font-black px-1.5 py-0.5 rounded-full">
+                {pendingUsers.length}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveUserTab('active')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+              activeUserTab === 'active'
+                ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+                : 'text-slate-500 hover:text-slate-300'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            Todos los usuarios
+          </button>
         </div>
+
+        {/* Pending Users */}
+        {activeUserTab === 'pending' && (
+          <div className="space-y-3">
+            {pendingUsers.length === 0 ? (
+              <div className="glass-card rounded-2xl p-10 text-center">
+                <CheckCircle className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
+                <p className="text-white font-bold">Sin solicitudes pendientes</p>
+                <p className="text-slate-500 text-sm">Todos los usuarios han sido revisados.</p>
+              </div>
+            ) : pendingUsers.map(u => (
+              <motion.div
+                key={u.uid}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="glass-card rounded-2xl p-4 flex items-center gap-4"
+                style={{ border: '1px solid rgba(251,191,36,0.2)' }}
+              >
+                <img
+                  src={u.photoURL || `https://ui-avatars.com/api/?name=${u.displayName}&background=1e3a5f&color=38bdf8`}
+                  className="w-12 h-12 rounded-2xl border-2 border-amber-500/30"
+                  alt=""
+                />
+                <div className="flex-grow min-w-0">
+                  <div className="font-bold text-white truncate">{u.displayName}</div>
+                  <div className="text-xs text-slate-400 truncate">{u.email}</div>
+                  <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">⏳ Pendiente</span>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => approveUser(u)}
+                    className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25 transition-all"
+                  >
+                    <CheckCircle className="w-4 h-4" /> Aprobar
+                  </motion.button>
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => rejectUser(u)}
+                    className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-all"
+                  >
+                    <X className="w-4 h-4" /> Rechazar
+                  </motion.button>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
+
+        {/* Active Users Table */}
+        {activeUserTab === 'active' && (
+          <>
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <input
+                type="text"
+                placeholder="Buscar usuario..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl text-white text-sm outline-none"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
+              />
+            </div>
+            <div className="space-y-2">
+              {activeUsers.map(u => (
+                <div key={u.uid} className="glass-card rounded-2xl p-4 flex items-center gap-3">
+                  <img
+                    src={u.photoURL || `https://ui-avatars.com/api/?name=${u.displayName}&background=1e3a5f&color=38bdf8`}
+                    className="w-10 h-10 rounded-xl border border-white/10"
+                    alt=""
+                  />
+                  <div className="flex-grow min-w-0">
+                    <div className="font-bold text-white text-sm truncate">{u.displayName}</div>
+                    <div className="text-[11px] text-slate-500 truncate">{u.email}</div>
+                  </div>
+                  <select
+                    value={u.role}
+                    onChange={(e) => updateUserRole(u, e.target.value as any)}
+                    disabled={
+                      (currentProfile.role === 'admin' && u.role === 'super_admin') ||
+                      (currentProfile.role === 'admin' && u.role === 'admin' && u.uid !== currentUser.uid)
+                    }
+                    className="text-xs font-bold rounded-lg px-2 py-1 outline-none text-cyan-400 disabled:opacity-40"
+                    style={{ background: 'rgba(6,182,212,0.1)', border: '1px solid rgba(6,182,212,0.2)' }}
+                  >
+                    <option value="user">Usuario</option>
+                    <option value="admin">Admin</option>
+                    {currentProfile.role === 'super_admin' && <option value="super_admin">Super Admin</option>}
+                  </select>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase shrink-0 ${
+                    u.status === 'active' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'
+                  }`}>
+                    {u.status === 'active' ? 'Activo' : 'Bloqueado'}
+                  </span>
+                  <div className="flex gap-1 shrink-0">
+                    <button
+                      onClick={() => toggleUserStatus(u)}
+                      disabled={(currentProfile.role === 'admin' && u.role !== 'user') || u.uid === currentUser.uid}
+                      className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-20"
+                    >
+                      <Ban className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => deleteUser(u)}
+                      disabled={(currentProfile.role === 'admin' && u.role !== 'user') || u.uid === currentUser.uid}
+                      className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-20"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Create User Modal */}
       <AnimatePresence>
         {showCreateModal && (
           <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setShowCreateModal(false)}
-              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+              className="absolute inset-0 bg-black/70 backdrop-blur-sm"
             />
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden"
+              className="relative w-full max-w-md rounded-3xl shadow-2xl overflow-hidden"
+              style={{ background: 'rgba(15,23,42,0.98)', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(40px)' }}
             >
-              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-                <h2 className="text-xl font-bold text-slate-900">Crear Nuevo Usuario</h2>
-                <button onClick={() => setShowCreateModal(false)} className="p-2 hover:bg-slate-100 rounded-full">
+              <div className="p-6 border-b border-white/5 flex items-center justify-between">
+                <h2 className="text-xl font-black text-white">Crear Nuevo Usuario</h2>
+                <button onClick={() => setShowCreateModal(false)} className="p-2 hover:bg-white/10 rounded-full">
                   <X className="w-5 h-5 text-slate-500" />
                 </button>
               </div>
               <form onSubmit={handleCreateUser} className="p-6 space-y-4">
+                {(['displayName', 'email', 'password'] as const).map((field) => (
+                  <div key={field}>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                      {field === 'displayName' ? 'Nombre Completo' : field === 'email' ? 'Correo Electrónico' : 'Contraseña'}
+                    </label>
+                    <input
+                      type={field === 'password' ? 'password' : field === 'email' ? 'email' : 'text'}
+                      required
+                      minLength={field === 'password' ? 6 : undefined}
+                      value={newUser[field]}
+                      onChange={(e) => setNewUser({ ...newUser, [field]: e.target.value })}
+                      className="w-full px-4 py-3 rounded-xl text-white text-sm outline-none focus:border-cyan-500/50 transition-colors"
+                      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
+                    />
+                  </div>
+                ))}
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Nombre Completo</label>
-                  <input 
-                    type="text" 
-                    required
-                    value={newUser.displayName}
-                    onChange={(e) => setNewUser({ ...newUser, displayName: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Correo Electrónico</label>
-                  <input 
-                    type="email" 
-                    required
-                    value={newUser.email}
-                    onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Contraseña</label>
-                  <input 
-                    type="password" 
-                    required
-                    minLength={6}
-                    value={newUser.password}
-                    onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Rol</label>
-                  <select 
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Rol</label>
+                  <select
                     value={newUser.role}
                     onChange={(e) => setNewUser({ ...newUser, role: e.target.value as any })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-3 rounded-xl text-white text-sm outline-none"
+                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
                   >
                     <option value="user">Usuario</option>
                     <option value="admin">Administrador</option>
                     {currentProfile.role === 'super_admin' && <option value="super_admin">Super Admin</option>}
                   </select>
                 </div>
-                <button 
+                <button
                   type="submit"
                   disabled={creating}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-blue-100 disabled:opacity-50"
+                  className="w-full btn-primary text-white font-bold py-3 rounded-xl transition-all disabled:opacity-50"
                 >
                   {creating ? 'Creando...' : 'Crear Usuario'}
                 </button>
@@ -745,28 +854,28 @@ export default function App() {
       clearTimeout(timeout);
       try {
         if (user) {
-          // Check if user exists and set session
           const userRef = doc(db, 'users', user.uid);
           const userDoc = await getDoc(userRef);
-          
+
           if (userDoc.exists()) {
             const data = userDoc.data() as UserProfile;
+
             if (data.status === 'disabled') {
-              alert("Tu cuenta ha sido deshabilitada.");
+              alert("Tu cuenta ha sido deshabilitada. Contacta al administrador.");
               await signOut(auth);
               setLoading(false);
               return;
             }
-            
+
             // Auto-upgrade owner email to super_admin if needed
             if (user.email === "juniorborre011@gmail.com" && data.role !== 'super_admin') {
-              await updateDoc(userRef, { role: 'super_admin' });
+              await updateDoc(userRef, { role: 'super_admin', status: 'active' });
             }
 
             // Update session ID
             await updateDoc(userRef, { sessionId: currentSessionId });
           } else {
-            // Create new user
+            // First-time login: owner gets super_admin + active, everyone else gets pending
             const isOwnerEmail = user.email === "juniorborre011@gmail.com";
             const newProfile: UserProfile = {
               uid: user.uid,
@@ -774,9 +883,10 @@ export default function App() {
               email: user.email || '',
               photoURL: user.photoURL || '',
               role: isOwnerEmail ? 'super_admin' : 'user',
-              status: 'active',
+              status: isOwnerEmail ? 'active' : 'pending',
               sessionId: currentSessionId,
-              karma: 0
+              karma: 0,
+              createdAt: serverTimestamp() as any,
             };
             await setDoc(userRef, newProfile);
           }
@@ -1123,6 +1233,11 @@ export default function App() {
     }
     setPullDistance(0);
   };
+
+  // Gate: usuarios pendientes de aprobación ven pantalla de espera
+  if (user && profile && profile.status === 'pending') {
+    return <PendingApprovalScreen onLogout={logout} />;
+  }
 
   if (!user) {
     return (
