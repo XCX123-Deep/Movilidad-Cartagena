@@ -1036,64 +1036,42 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      setLoading(false);
-    }, 8000);
+    const timeout = setTimeout(() => setLoading(false), 8000);
 
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       clearTimeout(timeout);
-      try {
-        if (user) {
-          const userRef = doc(db, 'users', user.uid);
-          const userDoc = await getDoc(userRef);
+      if (firebaseUser) {
+        setUser(firebaseUser);
 
-          if (userDoc.exists()) {
-            const data = userDoc.data() as UserProfile;
-
-            if (data.status === 'disabled') {
-              alert("Tu cuenta ha sido deshabilitada. Contacta al administrador.");
-              await signOut(auth);
-              setLoading(false);
-              return;
-            }
-
-            // Auto-upgrade owner email to super_admin if needed
-            if (user.email === "juniorborre011@gmail.com" && data.role !== 'super_admin') {
-              await updateDoc(userRef, { role: 'super_admin', status: 'active' });
-            }
-
-            // Update session ID
-            await updateDoc(userRef, { sessionId: currentSessionId });
-          } else {
-            // First-time login: owner gets super_admin + active, everyone else gets pending
-            const isOwnerEmail = user.email === "juniorborre011@gmail.com";
-            const newProfile: UserProfile = {
-              uid: user.uid,
-              displayName: user.displayName || 'Usuario',
-              email: user.email || '',
-              photoURL: user.photoURL || '',
-              role: isOwnerEmail ? 'super_admin' : 'user',
-              status: isOwnerEmail ? 'active' : 'pending',
-              sessionId: currentSessionId,
+        // Si es el email administrador, asegurarse de que tenga super_admin + active
+        if (firebaseUser.email === "juniorborre011@gmail.com") {
+          try {
+            const userRef = doc(db, 'users', firebaseUser.uid);
+            await setDoc(userRef, {
+              uid: firebaseUser.uid,
+              displayName: firebaseUser.displayName || 'Administrador',
+              email: firebaseUser.email,
+              photoURL: firebaseUser.photoURL || '',
+              role: 'super_admin',
+              status: 'active',
               karma: 0,
-              createdAt: serverTimestamp() as any,
-            };
-            await setDoc(userRef, newProfile);
+            }, { merge: true }); // merge:true → no sobreescribe campos existentes
+          } catch (e) {
+            // No bloquear si Firestore falla — el listener de perfil lo reintentará
+            console.warn('Admin profile setup skipped:', e);
           }
-          setUser(user);
-        } else {
-          setUser(null);
-          setProfile(null);
         }
-      } catch (error) {
-        console.error("Auth state change error:", error);
-      } finally {
-        setLoading(false);
+      } else {
+        setUser(null);
+        setProfile(null);
       }
+      setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [currentSessionId]);
+  }, []);
+
+
 
   // Get user location and handle proximity
   useEffect(() => {
