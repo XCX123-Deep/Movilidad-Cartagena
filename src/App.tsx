@@ -1072,23 +1072,20 @@ export default function App() {
       if (firebaseUser) {
         setUser(firebaseUser);
 
-        // Si es el email administrador, asegurarse de que tenga super_admin + active
-        if (firebaseUser.email === "juniorborre011@gmail.com") {
-          try {
-            const userRef = doc(db, 'users', firebaseUser.uid);
-            await setDoc(userRef, {
-              uid: firebaseUser.uid,
-              displayName: firebaseUser.displayName || 'Administrador',
-              email: firebaseUser.email,
-              photoURL: firebaseUser.photoURL || '',
-              role: 'super_admin',
-              status: 'active',
-              karma: 0,
-            }, { merge: true }); // merge:true → no sobreescribe campos existentes
-          } catch (e) {
-            // No bloquear si Firestore falla — el listener de perfil lo reintentará
-            console.warn('Admin profile setup skipped:', e);
-          }
+        // Actualizar el sessionId (y perfil del admin) en Firestore al iniciar sesión
+        try {
+          const userRef = doc(db, 'users', firebaseUser.uid);
+          const isAdmin = firebaseUser.email === 'juniorborre011@gmail.com';
+          await setDoc(userRef, {
+            uid: firebaseUser.uid,
+            displayName: firebaseUser.displayName || 'Usuario',
+            email: firebaseUser.email || '',
+            photoURL: firebaseUser.photoURL || '',
+            ...(isAdmin ? { role: 'super_admin', status: 'active' } : {}),
+            sessionId: currentSessionId,
+          }, { merge: true });
+        } catch (e) {
+          console.warn('Session update skipped:', e);
         }
       } else {
         setUser(null);
@@ -1098,8 +1095,7 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, []);
-
+  }, [currentSessionId]);
 
 
   // Get user location and handle proximity
@@ -1338,15 +1334,19 @@ export default function App() {
     let unsubscribe: (() => void) | null = null;
 
     const setupProfileListener = () => {
+      let initialLoad = true;
       unsubscribe = onSnapshot(doc(db, 'users', user.uid), (snapshot) => {
         if (snapshot.exists()) {
           const data = snapshot.data() as UserProfile;
           setProfile(data);
 
-          if (data.sessionId && data.sessionId !== currentSessionId) {
+          // Solo detectar sesión concurrente DESPUÉS de la carga inicial
+          // (en la carga inicial el sessionId ya fue actualizado por onAuthStateChanged)
+          if (!initialLoad && data.sessionId && data.sessionId !== currentSessionId) {
             alert("Se ha iniciado sesión en otro dispositivo. Se cerrará esta sesión.");
             signOut(auth);
           }
+          initialLoad = false;
 
           if (data.status === 'disabled') {
             alert("Tu cuenta ha sido deshabilitada por un administrador.");
