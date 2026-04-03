@@ -305,20 +305,22 @@ const AuthScreen = () => {
   const labelClass = "block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2";
 
   return (
-    <div className="min-h-screen overflow-y-auto bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 flex flex-col items-center justify-center py-8 px-5 relative">
-      {/* Background blobs */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+    <div className="overflow-y-auto h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 relative">
+      {/* Background blobs — fijos, no scrollean */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }} transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }} className="absolute top-1/4 -left-40 w-80 h-80 bg-blue-600/20 rounded-full blur-3xl" />
         <motion.div animate={{ scale: [1, 1.3, 1], opacity: [0.2, 0.4, 0.2] }} transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut', delay: 2 }} className="absolute bottom-1/4 -right-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl" />
         <motion.div animate={{ scale: [1, 1.1, 1], opacity: [0.1, 0.3, 0.1] }} transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut', delay: 4 }} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-cyan-600/10 rounded-full blur-3xl" />
       </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 30, scale: 0.97 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-        className="max-w-sm w-full relative z-10"
-      >
+      {/* Centrado vertical — solo en pantallas donde el contenido cabe */}
+      <div className="flex flex-col items-center justify-center min-h-full px-5 py-10 relative z-10">
+        <motion.div
+          initial={{ opacity: 0, y: 30, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+          className="max-w-sm w-full"
+        >
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="relative inline-block mb-5">
@@ -453,7 +455,8 @@ const AuthScreen = () => {
         </motion.div>
 
         <p className="text-center text-xs text-slate-600 mt-5">Cartagena, Colombia 🇨🇴</p>
-      </motion.div>
+        </motion.div>
+        </div>
     </div>
   );
 };
