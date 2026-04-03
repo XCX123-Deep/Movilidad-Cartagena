@@ -281,6 +281,7 @@ const AuthScreen = () => {
       setLoading(true);
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       // Crear perfil en Firestore con status 'pending'
+      // Usamos merge:true para no entrar en conflicto con onAuthStateChanged
       await setDoc(doc(db, 'users', cred.user.uid), {
         uid: cred.user.uid,
         displayName: name,
@@ -290,7 +291,7 @@ const AuthScreen = () => {
         status: 'pending',
         karma: 0,
         createdAt: new Date().toISOString(),
-      });
+      }, { merge: true });
     } catch (err: any) {
       setLoading(false);
       if (err.code === 'auth/email-already-in-use') {
@@ -475,11 +476,29 @@ const UserManagement = ({ currentUser, currentProfile }: { currentUser: User, cu
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
-    // Sin orderBy para evitar requerir índice compuesto
-    const q = query(collection(db, 'users'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const all = snapshot.docs.map(doc => doc.data() as UserProfile);
-      // Ordenar en el cliente: primero pendientes, luego por email
+    // Query específica para usuarios pendientes (no depende de filtrado en cliente)
+    const pendingQ = query(collection(db, 'users'), where('status', '==', 'pending'));
+    const allQ = query(collection(db, 'users'));
+
+    const unsubPending = onSnapshot(pendingQ, (snap) => {
+      const pending = snap.docs.map(d => d.data() as UserProfile);
+      setUsers(prev => {
+        // Combinar: reemplazar los pendientes y conservar el resto
+        const nonPending = prev.filter(u => u.status !== 'pending');
+        const merged = [...pending, ...nonPending];
+        merged.sort((a, b) => {
+          if (a.status === 'pending' && b.status !== 'pending') return -1;
+          if (a.status !== 'pending' && b.status === 'pending') return 1;
+          return (a.email || '').localeCompare(b.email || '');
+        });
+        return merged;
+      });
+    }, (error) => {
+      console.error('Error loading pending users:', error.code, error.message);
+    });
+
+    const unsubAll = onSnapshot(allQ, (snap) => {
+      const all = snap.docs.map(d => d.data() as UserProfile);
       all.sort((a, b) => {
         if (a.status === 'pending' && b.status !== 'pending') return -1;
         if (a.status !== 'pending' && b.status === 'pending') return 1;
@@ -487,9 +506,10 @@ const UserManagement = ({ currentUser, currentProfile }: { currentUser: User, cu
       });
       setUsers(all);
     }, (error) => {
-      console.error('Error loading users:', error);
+      console.error('Error loading all users:', error.code, error.message);
     });
-    return () => unsubscribe();
+
+    return () => { unsubPending(); unsubAll(); };
   }, []);
 
   const handleCreateUser = async (e: React.FormEvent) => {
