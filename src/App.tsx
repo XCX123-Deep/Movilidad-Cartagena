@@ -1110,18 +1110,32 @@ export default function App() {
       if (firebaseUser) {
         setUser(firebaseUser);
 
-        // Actualizar el sessionId (y perfil del admin) en Firestore al iniciar sesión
+        // Sincronizar perfil en Firestore al iniciar sesión
         try {
           const userRef = doc(db, 'users', firebaseUser.uid);
           const isAdmin = firebaseUser.email === 'juniorborre011@gmail.com';
-          await setDoc(userRef, {
-            uid: firebaseUser.uid,
-            displayName: firebaseUser.displayName || 'Usuario',
-            email: firebaseUser.email || '',
-            photoURL: firebaseUser.photoURL || '',
-            ...(isAdmin ? { role: 'super_admin', status: 'active' } : {}),
-            sessionId: currentSessionId,
-          }, { merge: true });
+          const existingDoc = await getDoc(userRef);
+
+          if (existingDoc.exists()) {
+            // Usuario ya tiene perfil -> solo actualizar sessionId (y campos de admin si aplica)
+            await setDoc(userRef, {
+              ...(isAdmin ? { role: 'super_admin', status: 'active' } : {}),
+              sessionId: currentSessionId,
+            }, { merge: true });
+          } else {
+            // Usuario nuevo sin documento -> crear perfil completo con status:'pending'
+            await setDoc(userRef, {
+              uid: firebaseUser.uid,
+              displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Usuario',
+              email: firebaseUser.email || '',
+              photoURL: firebaseUser.photoURL || '',
+              role: isAdmin ? 'super_admin' : 'user',
+              status: isAdmin ? 'active' : 'pending',
+              karma: 0,
+              createdAt: new Date().toISOString(),
+              sessionId: currentSessionId,
+            });
+          }
         } catch (e) {
           console.warn('Session update skipped:', e);
         }
@@ -1461,8 +1475,9 @@ export default function App() {
     setPullDistance(0);
   };
 
-  // Gate: usuarios pendientes de aprobación ven pantalla de espera
-  if (user && profile && profile.status === 'pending') {
+  // Gate: bloquear acceso a usuarios no aprobados (admins siempre pasan)
+  const isAdminRole = profile?.role === 'admin' || profile?.role === 'super_admin';
+  if (user && profile && !isAdminRole && profile.status !== 'active') {
     return <PendingApprovalScreen onLogout={logout} />;
   }
 
