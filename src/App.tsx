@@ -3,7 +3,8 @@ import {
   auth, 
   db, 
   googleProvider, 
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut, 
   onAuthStateChanged, 
   createUserWithEmailAndPassword,
@@ -848,7 +849,12 @@ export default function App() {
     // Safety timeout for loading state
     const timeout = setTimeout(() => {
       setLoading(false);
-    }, 5000);
+    }, 8000);
+
+    // Procesar resultado del redirect de Google (si viene de signInWithRedirect)
+    getRedirectResult(auth).catch((err) => {
+      console.warn('Redirect result error (ignorable):', err?.code);
+    });
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       clearTimeout(timeout);
@@ -1127,8 +1133,8 @@ export default function App() {
 
   const login = async () => {
     try {
-      // Usar popup en todos los dispositivos (redirect causa problemas con COOP en móvil)
-      await signInWithPopup(auth, googleProvider);
+      // Usar redirect en lugar de popup: evita el error Cross-Origin-Opener-Policy
+      await signInWithRedirect(auth, googleProvider);
     } catch (error) {
       console.error("Login failed", error);
     }
