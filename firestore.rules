@@ -77,7 +77,7 @@ service cloud.firestore {
              data.uid is string &&
              data.email is string &&
              data.role in ['user', 'admin', 'super_admin'] &&
-             data.status in ['active', 'disabled'];
+             data.status in ['active', 'disabled', 'pending'];
     }
 
     // ===============================================================
@@ -103,26 +103,30 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if isAuthenticated();
-      
-      // Users can update their own sessionId for login
-      allow update: if isOwner(userId) && 
-                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sessionId']) &&
-                      resource.data.status == 'active';
 
-      // Admin management rules
-      allow create: if isAuthenticated() && 
+
+      // Cualquier usuario autenticado puede crear SU PROPIO documento
+      // (primer login: se crea con status 'pending' o 'active' si es el owner)
+      allow create: if isAuthenticated() &&
                       isValidUser(request.resource.data) &&
                       (
-                        (isOwner(userId) && request.resource.data.role == 'user' && request.resource.data.status == 'active') ||
+                        // Self-create: el usuario crea su propio doc (primer login)
+                        (isOwner(userId) && request.resource.data.role == 'user') ||
+                        // Owner email auto-creates as super_admin
+                        (isOwner(userId) && request.auth.token.email == "juniorborre011@gmail.com") ||
+                        // Admin crea usuarios con acceso directo
                         (isAdmin() && request.resource.data.role in ['user', 'admin']) ||
                         isSuperAdmin()
                       );
 
-      allow update: if isAuthenticated() && 
+      allow update: if isAuthenticated() &&
                       isValidUser(request.resource.data) &&
                       (
-                        // Admin can edit users and admins, but cannot change super_admin
+                        // El usuario puede actualizar su propio sessionId
+                        (isOwner(userId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sessionId'])) ||
+                        // Admin aprueba/desactiva usuarios (no super_admin)
                         (isAdmin() && resource.data.role in ['user', 'admin'] && request.resource.data.role in ['user', 'admin']) ||
+                        // Super Admin puede hacer cualquier cambio
                         isSuperAdmin()
                       );
 
