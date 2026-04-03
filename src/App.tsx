@@ -1400,21 +1400,22 @@ export default function App() {
           )}
         </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => {
-              if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                  (pos) => setUserLocation([pos.coords.latitude, pos.coords.longitude]),
-                  () => alert("Por favor habilita la ubicación en tu navegador.")
-                );
-              }
-            }}
-            className="p-2 hover:bg-white/10 rounded-full transition-colors text-cyan-400"
-            title="Mi ubicación"
-          >
-            <Navigation className="w-5 h-5" />
-          </button>
+        {/* Header right side */}
+        <div className="flex items-center gap-2">
+          {/* Mobile: botón para acceder a la gestión de usuarios */}
+          {(profile?.role === 'admin' || profile?.role === 'super_admin') && (
+            <button
+              onClick={() => setActiveTab(activeTab === 'users' ? 'map' : 'users')}
+              className={`md:hidden p-2 rounded-xl transition-all ${
+                activeTab === 'users'
+                  ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+                  : 'hover:bg-white/10 text-slate-400'
+              }`}
+              title="Gestión de usuarios"
+            >
+              <Users className="w-5 h-5" />
+            </button>
+          )}
 
           <div className="hidden sm:flex flex-col items-end">
             <div className="flex items-center gap-1">
@@ -1443,7 +1444,7 @@ export default function App() {
 
       <main className="flex-1 flex flex-col lg:flex-row overflow-hidden relative min-h-0">
         {activeTab === 'users' && profile && (profile.role === 'admin' || profile.role === 'super_admin') ? (
-          <div className="flex-1 overflow-y-auto bg-slate-950">
+          <div className="flex-1 overflow-y-auto" style={{ background: '#0f172a' }}>
             <UserManagement currentUser={user} currentProfile={profile} />
           </div>
         ) : (
