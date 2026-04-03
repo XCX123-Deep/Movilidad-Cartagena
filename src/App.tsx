@@ -1114,27 +1114,26 @@ export default function App() {
         try {
           const userRef = doc(db, 'users', firebaseUser.uid);
           const isAdmin = firebaseUser.email === 'juniorborre011@gmail.com';
-          const existingDoc = await getDoc(userRef);
 
-          if (existingDoc.exists()) {
-            // Usuario ya tiene perfil -> solo actualizar sessionId (y campos de admin si aplica)
+          if (isAdmin) {
+            // Admin: asegurar que su perfil siempre existe y está actualizado
             await setDoc(userRef, {
-              ...(isAdmin ? { role: 'super_admin', status: 'active' } : {}),
+              uid: firebaseUser.uid,
+              displayName: firebaseUser.displayName || 'Admin',
+              email: firebaseUser.email || '',
+              photoURL: firebaseUser.photoURL || '',
+              role: 'super_admin',
+              status: 'active',
               sessionId: currentSessionId,
             }, { merge: true });
           } else {
-            // Usuario nuevo sin documento -> crear perfil completo con status:'pending'
-            await setDoc(userRef, {
-              uid: firebaseUser.uid,
-              displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Usuario',
-              email: firebaseUser.email || '',
-              photoURL: firebaseUser.photoURL || '',
-              role: isAdmin ? 'super_admin' : 'user',
-              status: isAdmin ? 'active' : 'pending',
-              karma: 0,
-              createdAt: new Date().toISOString(),
-              sessionId: currentSessionId,
-            });
+            // Usuario regular: solo actualizar sessionId si el documento ya existe
+            // (handleRegister crea el documento para nuevos usuarios)
+            try {
+              await updateDoc(userRef, { sessionId: currentSessionId });
+            } catch {
+              // Doc no existe aún (usuario recién registrado) - handleRegister lo creará
+            }
           }
         } catch (e) {
           console.warn('Session update skipped:', e);
