@@ -10,8 +10,8 @@ export interface Report {
   type: ReportType;
   location: Location;
   description?: string;
-  timestamp: any; // Firestore Timestamp
-  expiresAt: any; // Firestore Timestamp
+  timestamp: string | Date;   // ISO string desde MongoDB
+  expiresAt: string | Date;   // ISO string desde MongoDB
   reporterUid: string;
   reporterName?: string;
   reporterKarma?: number;
@@ -29,5 +29,5 @@ export interface UserProfile {
   status: 'active' | 'disabled' | 'pending';
   sessionId?: string;
   karma: number;
-  createdAt?: any;
+  createdAt?: string;
 }

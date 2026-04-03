@@ -1,34 +1,45 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged, User, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
-import { getFirestore, collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, Timestamp, doc, getDoc, setDoc, updateDoc, deleteDoc, limit } from 'firebase/firestore';
+import {
+  getAuth,
+  signOut,
+  onAuthStateChanged,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  type User
+} from 'firebase/auth';
 import firebaseConfig from '../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-export const googleProvider = new GoogleAuthProvider();
 
-export { 
-  signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult,
-  signOut, 
-  onAuthStateChanged, 
+// Helper: obtiene el token de autenticación del usuario actual para las llamadas API
+export async function getAuthToken(): Promise<string> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('No hay usuario autenticado');
+  return user.getIdToken();
+}
+
+// Helper: fetch autenticado a la API del servidor
+export async function apiFetch(
+  path: string,
+  options: RequestInit = {}
+): Promise<Response> {
+  const token = await getAuthToken();
+  return fetch(path, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      ...(options.headers || {}),
+    },
+  });
+}
+
+export {
+  signOut,
+  onAuthStateChanged,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  collection, 
-  addDoc, 
-  query, 
-  where, 
-  onSnapshot, 
-  orderBy, 
-  serverTimestamp, 
-  Timestamp,
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  deleteDoc,
-  limit
 };
+
 export type { User };

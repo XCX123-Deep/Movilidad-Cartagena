@@ -1,33 +1,13 @@
-import React, { useState, useEffect, createContext, useContext } from 'react';
-import { 
-  auth, 
-  db, 
-  googleProvider,
-  signInWithPopup,
-  signOut, 
-  onAuthStateChanged, 
+import React, { useState, useEffect, useRef, createContext, useContext, useCallback } from 'react';
+import {
+  auth,
+  apiFetch,
+  signOut,
+  onAuthStateChanged,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  collection, 
-  query, 
-  where, 
-  onSnapshot, 
-  orderBy, 
-  addDoc, 
-  serverTimestamp,
-  doc,
-  setDoc,
-  getDoc,
-  updateDoc,
-  deleteDoc,
-  Timestamp,
-  limit
+  type User
 } from './firebase';
-import { initializeApp, getApp, getApps, deleteApp } from 'firebase/app';
-import firebaseConfig from '../firebase-applet-config.json';
-import { getAuth } from 'firebase/auth';
-import { User } from 'firebase/auth';
-import { increment } from 'firebase/firestore';
 import { UserProfile, Report, ReportType } from './types';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, Circle } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -78,18 +58,29 @@ let DefaultIcon = L.icon({
 
 L.Marker.prototype.options.icon = DefaultIcon;
 
+// Constante para el Admin
+const ADMIN_EMAIL = 'juniorborre011@gmail.com';
+
+// ID de sesión único para detectar sesiones concurrentes
+const currentSessionId = Math.random().toString(36).substr(2, 9);
+
+// Helper: convertir timestamp ISO a objeto Date
+function toDate(val: any): Date {
+  if (!val) return new Date();
+  if (val instanceof Date) return val;
+  return new Date(val);
+}
+
 // --- Context ---
 const AuthContext = createContext<{
   user: User | null;
   profile: UserProfile | null;
   loading: boolean;
-  login: () => Promise<void>;
   logout: () => Promise<void>;
 }>({
   user: null,
   profile: null,
   loading: true,
-  login: async () => {},
   logout: async () => {},
 });
 
@@ -280,18 +271,22 @@ const AuthScreen = () => {
     try {
       setLoading(true);
       const cred = await createUserWithEmailAndPassword(auth, email, password);
-      // Crear perfil en Firestore con status 'pending'
-      // Usamos merge:true para no entrar en conflicto con onAuthStateChanged
-      await setDoc(doc(db, 'users', cred.user.uid), {
-        uid: cred.user.uid,
-        displayName: name,
-        email: email,
-        photoURL: '',
-        role: 'user',
-        status: 'pending',
-        karma: 0,
-        createdAt: new Date().toISOString(),
-      }, { merge: true });
+      // Crear perfil en MongoDB con status 'pending'
+      const token = await cred.user.getIdToken();
+      await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          uid: cred.user.uid,
+          displayName: name,
+          email,
+          photoURL: '',
+          role: 'user',
+          status: 'pending',
+          karma: 0,
+          createdAt: new Date().toISOString(),
+        }),
+      });
     } catch (err: any) {
       setLoading(false);
       if (err.code === 'auth/email-already-in-use') {
@@ -389,32 +384,6 @@ const AuthScreen = () => {
                 {loading ? 'Ingresando...' : 'Iniciar Sesión'}
               </motion.button>
 
-              <div className="relative flex items-center my-1">
-                <div className="flex-grow border-t border-white/10" />
-                <span className="flex-shrink mx-4 text-xs font-bold text-slate-600 uppercase tracking-widest">o</span>
-                <div className="flex-grow border-t border-white/10" />
-              </div>
-
-              <motion.button
-                type="button"
-                disabled={loading}
-                whileTap={{ scale: 0.97 }}
-                onClick={async () => {
-                  try {
-                    setLoading(true);
-                    await signInWithPopup(auth, googleProvider);
-                  } catch (err: any) {
-                    setLoading(false);
-                    if (err.code !== 'auth/popup-closed-by-user') {
-                      setError('Error al iniciar sesión con Google.');
-                    }
-                  }
-                }}
-                className="w-full bg-white/8 hover:bg-white/12 border border-white/15 text-white font-bold py-3.5 px-6 rounded-2xl transition-all flex items-center justify-center gap-3 text-sm disabled:opacity-60"
-              >
-                <img src="https://www.google.com/favicon.ico" className="w-4 h-4" alt="Google" />
-                Continuar con Google
-              </motion.button>
             </form>
           ) : (
             <form onSubmit={handleRegister} className="space-y-4">
@@ -476,66 +445,50 @@ const UserManagement = ({ currentUser, currentProfile }: { currentUser: User, cu
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
-    // Query específica para usuarios pendientes (no depende de filtrado en cliente)
-    const pendingQ = query(collection(db, 'users'), where('status', '==', 'pending'));
-    const allQ = query(collection(db, 'users'));
+    // Cargar usuarios via API y refrescar cada 10s
+    const fetchUsers = async () => {
+      try {
+        const res = await apiFetch('/api/users');
+        if (res.ok) {
+          const data: UserProfile[] = await res.json();
+          data.sort((a, b) => {
+            if (a.status === 'pending' && b.status !== 'pending') return -1;
+            if (a.status !== 'pending' && b.status === 'pending') return 1;
+            return (a.email || '').localeCompare(b.email || '');
+          });
+          setUsers(data);
+        } else {
+          console.error('Error fetching users:', await res.text());
+        }
+      } catch (err) {
+        console.error('Error loading users:', err);
+      }
+    };
 
-    const unsubPending = onSnapshot(pendingQ, (snap) => {
-      const pending = snap.docs.map(d => d.data() as UserProfile);
-      setUsers(prev => {
-        // Combinar: reemplazar los pendientes y conservar el resto
-        const nonPending = prev.filter(u => u.status !== 'pending');
-        const merged = [...pending, ...nonPending];
-        merged.sort((a, b) => {
-          if (a.status === 'pending' && b.status !== 'pending') return -1;
-          if (a.status !== 'pending' && b.status === 'pending') return 1;
-          return (a.email || '').localeCompare(b.email || '');
-        });
-        return merged;
-      });
-    }, (error) => {
-      console.error('Error loading pending users:', error.code, error.message);
-    });
-
-    const unsubAll = onSnapshot(allQ, (snap) => {
-      const all = snap.docs.map(d => d.data() as UserProfile);
-      all.sort((a, b) => {
-        if (a.status === 'pending' && b.status !== 'pending') return -1;
-        if (a.status !== 'pending' && b.status === 'pending') return 1;
-        return (a.email || '').localeCompare(b.email || '');
-      });
-      setUsers(all);
-    }, (error) => {
-      console.error('Error loading all users:', error.code, error.message);
-    });
-
-    return () => { unsubPending(); unsubAll(); };
+    fetchUsers();
+    const interval = setInterval(fetchUsers, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreating(true);
-    let secondaryApp: ReturnType<typeof initializeApp> | null = null;
     try {
-      try {
-        secondaryApp = getApp('Secondary');
-      } catch {
-        secondaryApp = initializeApp(firebaseConfig, 'Secondary');
+      // Crear usuario en Firebase Auth via la API del servidor
+      const res = await apiFetch('/api/users/create', {
+        method: 'POST',
+        body: JSON.stringify({
+          email: newUser.email,
+          password: newUser.password,
+          displayName: newUser.displayName || 'Usuario',
+          role: newUser.role,
+          status: 'active',
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Error desconocido');
       }
-      const secondaryAuth = getAuth(secondaryApp);
-      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, newUser.email, newUser.password);
-      const createdUser = userCredential.user;
-      const newProfile: UserProfile = {
-        uid: createdUser.uid,
-        displayName: newUser.displayName || 'Usuario',
-        email: newUser.email,
-        role: newUser.role,
-        status: 'active',
-        sessionId: '',
-        karma: 0
-      };
-      await setDoc(doc(db, 'users', createdUser.uid), newProfile);
-      await secondaryAuth.signOut();
       setShowCreateModal(false);
       setNewUser({ email: '', password: '', displayName: '', role: 'user' });
       alert("Usuario creado exitosamente.");
@@ -543,54 +496,46 @@ const UserManagement = ({ currentUser, currentProfile }: { currentUser: User, cu
       console.error("Error creating user", error);
       alert("Error al crear usuario: " + error.message);
     } finally {
-      if (secondaryApp) {
-        try { await deleteApp(secondaryApp); } catch {}
-      }
       setCreating(false);
     }
   };
 
   const approveUser = async (u: UserProfile) => {
     try {
-      await updateDoc(doc(db, 'users', u.uid), { status: 'active' });
-    } catch (error) {
-      alert("No tienes permisos para aprobar usuarios.");
-    }
+      const res = await apiFetch(`/api/users/${u.uid}`, { method: 'PATCH', body: JSON.stringify({ status: 'active' }) });
+      if (!res.ok) throw new Error((await res.json()).error);
+    } catch (error: any) { alert('Error al aprobar: ' + error.message); }
   };
 
   const rejectUser = async (u: UserProfile) => {
     if (!confirm(`¿Rechazar y eliminar la cuenta de ${u.displayName}?`)) return;
     try {
-      await deleteDoc(doc(db, 'users', u.uid));
-    } catch (error) {
-      alert("No tienes permisos para eliminar a este usuario.");
-    }
+      const res = await apiFetch(`/api/users/${u.uid}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error((await res.json()).error);
+    } catch (error: any) { alert('Error al rechazar: ' + error.message); }
   };
 
   const toggleUserStatus = async (u: UserProfile) => {
     const newStatus = u.status === 'active' ? 'disabled' : 'active';
     try {
-      await updateDoc(doc(db, 'users', u.uid), { status: newStatus });
-    } catch (error) {
-      alert("No tienes permisos para realizar esta acción.");
-    }
+      const res = await apiFetch(`/api/users/${u.uid}`, { method: 'PATCH', body: JSON.stringify({ status: newStatus }) });
+      if (!res.ok) throw new Error((await res.json()).error);
+    } catch (error: any) { alert('Error al cambiar estado: ' + error.message); }
   };
 
   const deleteUser = async (u: UserProfile) => {
-    if (!confirm(`¿Estás seguro de eliminar a ${u.displayName}?`)) return;
+    if (!confirm(`¿Eliminar a ${u.displayName}?`)) return;
     try {
-      await deleteDoc(doc(db, 'users', u.uid));
-    } catch (error) {
-      alert("No tienes permisos para eliminar a este usuario.");
-    }
+      const res = await apiFetch(`/api/users/${u.uid}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error((await res.json()).error);
+    } catch (error: any) { alert('Error al eliminar: ' + error.message); }
   };
 
   const updateUserRole = async (u: UserProfile, newRole: 'user' | 'admin' | 'super_admin') => {
     try {
-      await updateDoc(doc(db, 'users', u.uid), { role: newRole });
-    } catch (error) {
-      alert("No tienes permisos para cambiar el rol.");
-    }
+      const res = await apiFetch(`/api/users/${u.uid}`, { method: 'PATCH', body: JSON.stringify({ role: newRole }) });
+      if (!res.ok) throw new Error((await res.json()).error);
+    } catch (error: any) { alert('Error al cambiar rol: ' + error.message); }
   };
 
   // Incluir usuarios cuyo status sea 'pending' O que no tengan status definido (registro incompleto)
@@ -938,7 +883,7 @@ const ReportMarker = ({ report, onConfirm, onSelect }: { report: Report, onConfi
     const updateOpacity = () => {
       if (!report.expiresAt) return;
       const now = Date.now();
-      const expiry = report.expiresAt.toDate().getTime();
+      const expiry = toDate(report.expiresAt).getTime();
       const remaining = expiry - now;
       
       if (remaining <= 0) {
@@ -1046,46 +991,25 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [reports]);
 
-  // Handle App Visibility for WebSockets (onSnapshot)
+  // Handle App Visibility — carga reportes con polling cada 30s
   useEffect(() => {
-    let unsubscribe: (() => void) | null = null;
+    if (!user || activeTab !== 'map') return;
 
-    const setupListeners = () => {
-      if (!user || activeTab !== 'map') return;
-      
-      const q = query(
-        collection(db, 'reports'),
-        where('status', '==', 'active'),
-        orderBy('timestamp', 'desc')
-      );
-
-      unsubscribe = onSnapshot(q, (snapshot) => {
-        const reportsData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Report[];
-        setReports(reportsData);
-      });
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        setupListeners();
-      } else {
-        if (unsubscribe) {
-          unsubscribe();
-          unsubscribe = null;
+    const fetchReports = async () => {
+      try {
+        const res = await apiFetch('/api/reports');
+        if (res.ok) {
+          const data: Report[] = await res.json();
+          setReports(data);
         }
+      } catch (e) {
+        console.error('Error fetching reports:', e);
       }
     };
 
-    setupListeners();
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    return () => {
-      if (unsubscribe) unsubscribe();
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
+    fetchReports();
+    const interval = setInterval(fetchReports, 30000);
+    return () => clearInterval(interval);
   }, [user, activeTab]);
 
   useEffect(() => {
@@ -1105,39 +1029,10 @@ export default function App() {
   useEffect(() => {
     const timeout = setTimeout(() => setLoading(false), 8000);
 
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       clearTimeout(timeout);
       if (firebaseUser) {
         setUser(firebaseUser);
-
-        // Sincronizar perfil en Firestore al iniciar sesión
-        try {
-          const userRef = doc(db, 'users', firebaseUser.uid);
-          const isAdmin = firebaseUser.email === 'juniorborre011@gmail.com';
-
-          if (isAdmin) {
-            // Admin: asegurar que su perfil siempre existe y está actualizado
-            await setDoc(userRef, {
-              uid: firebaseUser.uid,
-              displayName: firebaseUser.displayName || 'Admin',
-              email: firebaseUser.email || '',
-              photoURL: firebaseUser.photoURL || '',
-              role: 'super_admin',
-              status: 'active',
-              sessionId: currentSessionId,
-            }, { merge: true });
-          } else {
-            // Usuario regular: solo actualizar sessionId si el documento ya existe
-            // (handleRegister crea el documento para nuevos usuarios)
-            try {
-              await updateDoc(userRef, { sessionId: currentSessionId });
-            } catch {
-              // Doc no existe aún (usuario recién registrado) - handleRegister lo creará
-            }
-          }
-        } catch (e) {
-          console.warn('Session update skipped:', e);
-        }
       } else {
         setUser(null);
         setProfile(null);
@@ -1146,7 +1041,7 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, [currentSessionId]);
+  }, []);
 
 
   // Get user location and handle proximity
@@ -1230,10 +1125,9 @@ export default function App() {
       if (offlineQueue.length > 0) {
         offlineQueue.forEach(async (report) => {
           try {
-            await addDoc(collection(db, 'reports'), {
-              ...report,
-              timestamp: serverTimestamp(),
-              expiresAt: Timestamp.fromMillis(Date.now() + 45 * 60 * 1000)
+            await apiFetch('/api/reports', {
+              method: 'POST',
+              body: JSON.stringify(report),
             });
           } catch (e) {
             console.error("Sync error", e);
@@ -1299,7 +1193,6 @@ export default function App() {
 
   const handleConfirmReport = async (reportId: string, stillThere: boolean) => {
     if (!user) return;
-    const reportRef = doc(db, 'reports', reportId);
     const report = reports.find(r => r.id === reportId);
     if (!report) return;
 
@@ -1308,21 +1201,24 @@ export default function App() {
         haptic('short');
         const newConfirmations = [...(report.confirmations || []), user.uid];
         const updates: any = { confirmations: newConfirmations };
-        
-        // Extend TTL if 5+ confirmations
         if (newConfirmations.length >= 5) {
-          const currentExpiry = report.expiresAt.toDate().getTime();
-          updates.expiresAt = Timestamp.fromMillis(currentExpiry + 30 * 60 * 1000);
+          const currentExpiry = new Date(report.expiresAt).getTime();
+          updates.expiresAt = new Date(currentExpiry + 30 * 60 * 1000).toISOString();
         }
-        
-        await updateDoc(reportRef, updates);
-        // Increase reporter karma usando increment() para evitar race conditions
-        await updateDoc(doc(db, 'users', report.reporterUid), { karma: increment(1) });
+        await apiFetch(`/api/reports/${reportId}`, { method: 'PATCH', body: JSON.stringify(updates) });
+        // Aumentar karma del que reportó
+        await apiFetch(`/api/users/${report.reporterUid}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ karma: (profile?.karma || 0) + 1 }),
+        });
       } else {
         const newDismissals = [...(report.dismissals || []), user.uid];
-        await updateDoc(reportRef, { 
-          dismissals: newDismissals,
-          status: newDismissals.length >= 3 ? 'resolved' : 'active'
+        await apiFetch(`/api/reports/${reportId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            dismissals: newDismissals,
+            status: newDismissals.length >= 3 ? 'resolved' : 'active',
+          }),
         });
       }
       setShowConfirmSheet(null);
@@ -1334,31 +1230,20 @@ export default function App() {
   const handleSubmitReport = async (reportData: Partial<Report>) => {
     if (!user) return;
     try {
-      const now = Date.now();
-      const expiresAt = Timestamp.fromMillis(now + 45 * 60 * 1000);
-      
-      await addDoc(collection(db, 'reports'), {
-        ...reportData,
-        reporterUid: user.uid,
-        reporterName: profile?.displayName || 'Usuario',
-        reporterKarma: profile?.karma || 0,
-        timestamp: serverTimestamp(),
-        expiresAt,
-        status: 'active',
-        confirmations: [],
-        dismissals: []
+      await apiFetch('/api/reports', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...reportData,
+          reporterUid: user.uid,
+          reporterName: profile?.displayName || 'Usuario',
+          reporterKarma: profile?.karma || 0,
+        }),
       });
 
       haptic('double');
-      
-      // Celebration for first report or just any report
+
       if (profile && profile.karma === 0) {
-        confetti({
-          particleCount: 150,
-          spread: 70,
-          origin: { y: 0.6 },
-          colors: ['#2563eb', '#f59e0b', '#ef4444']
-        });
+        confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#2563eb', '#f59e0b', '#ef4444'] });
         alert("¡Ya eres parte de la comunidad CartaVía! Tu primer reporte ha sido publicado.");
       }
 
@@ -1378,72 +1263,58 @@ export default function App() {
     }
   };
 
-  // Listen to profile changes (for session and status)
+  // Perfil: polling cada 15s para detectar cambios de status y sesión
   useEffect(() => {
     if (!user) return;
 
-    let unsubscribe: (() => void) | null = null;
+    let prevSessionId: string | null = null;
 
-    const setupProfileListener = () => {
-      let initialLoad = true;
-      unsubscribe = onSnapshot(doc(db, 'users', user.uid), (snapshot) => {
-        if (snapshot.exists()) {
-          const data = snapshot.data() as UserProfile;
+    const fetchProfile = async () => {
+      try {
+        const res = await apiFetch(`/api/users/${user.uid}`);
+        if (res.ok) {
+          const data: UserProfile = await res.json();
           setProfile(data);
 
-          // Solo detectar sesión concurrente DESPUÉS de la carga inicial
-          // (en la carga inicial el sessionId ya fue actualizado por onAuthStateChanged)
-          if (!initialLoad && data.sessionId && data.sessionId !== currentSessionId) {
+          // Detectar sesión concurrente
+          if (prevSessionId && data.sessionId && data.sessionId !== currentSessionId) {
             alert("Se ha iniciado sesión en otro dispositivo. Se cerrará esta sesión.");
             signOut(auth);
+            return;
           }
-          initialLoad = false;
+          prevSessionId = data.sessionId || null;
 
+          // Cuenta deshabilitada
           if (data.status === 'disabled') {
             alert("Tu cuenta ha sido deshabilitada por un administrador.");
             signOut(auth);
           }
-        }
-      });
-    };
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        setupProfileListener();
-      } else {
-        if (unsubscribe) {
-          unsubscribe();
-          unsubscribe = null;
+          // Sincronizar sessionId en primer fetch
+          if (!prevSessionId) {
+            await apiFetch(`/api/users/${user.uid}`, {
+              method: 'PATCH',
+              body: JSON.stringify({ sessionId: currentSessionId }),
+            }).catch(() => {});
+          }
         }
+      } catch (e) {
+        console.error('Error fetching profile:', e);
       }
     };
 
-    setupProfileListener();
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    return () => {
-      if (unsubscribe) unsubscribe();
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [user, currentSessionId]);
+    fetchProfile();
+    const interval = setInterval(fetchProfile, 15000);
+    return () => clearInterval(interval);
+  }, [user]);
 
+  // Heatmap: cargar reportes históricos cuando se activa el modo mapa de calor
   useEffect(() => {
     if (!user || !showHeatmap) return;
-
-    const q = query(
-      collection(db, 'reports'),
-      limit(500)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const reportsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Report[];
-      setHistoricalReports(reportsData);
-    });
-
-    return () => unsubscribe();
+    apiFetch('/api/reports')
+      .then(r => r.json())
+      .then(data => setHistoricalReports(data as Report[]))
+      .catch(e => console.error('Error loading heatmap data', e));
   }, [user, showHeatmap]);
 
   const handleRefresh = async () => {
