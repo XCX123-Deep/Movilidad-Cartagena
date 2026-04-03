@@ -305,7 +305,7 @@ const AuthScreen = () => {
   const labelClass = "block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 flex flex-col items-center justify-center p-5 relative overflow-hidden">
+    <div className="min-h-screen overflow-y-auto bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 flex flex-col items-center justify-center py-8 px-5 relative">
       {/* Background blobs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }} transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }} className="absolute top-1/4 -left-40 w-80 h-80 bg-blue-600/20 rounded-full blur-3xl" />
